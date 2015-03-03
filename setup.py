@@ -138,6 +138,10 @@ args = {
             'Topic :: System :: Systems Administration',
             'Topic :: Utilities',
     ],
+    'package_data': {
+        'redislite': ['package_metadata.json']
+    },
+    'include_package_data': True,
     'cmdclass': {
         'build': build_redis,
         'install': InstallRedis,
