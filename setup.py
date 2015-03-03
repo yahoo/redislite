@@ -174,7 +174,7 @@ if __name__ == '__main__':
     # We're being run from the command line so call setup with our arguments
 
     if os.path.isfile(METADATA_FILE):
-        metadata = json.load(METADATA_FILE)
+        metadata = json.load(open(METADATA_FILE))
     else:
         json.dump(metadata, open(METADATA_FILE, 'w'))
     setup(**setup_arguments)
