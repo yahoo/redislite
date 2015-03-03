@@ -2,6 +2,16 @@
 redislite
 ===============================
 
+.. image:: https://pypip.in/version/redislite/badge.svg
+   :target: https://pypi.python.org/pypi/redislite
+
+.. image:: https://pypip.in/py_versions/redislite/badge.svg
+    :target: https://pypi.python.org/pypi/redislite/
+
+.. image:: https://pypip.in/license/redislite/badge.svg
+    :target: https://pypi.python.org/pypi/redislite/
+
+
 Description
 -----------
 This module makes using Redis simple. 
