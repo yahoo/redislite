@@ -4,7 +4,7 @@ redislite
 
 Description
 -----------
-Redis made simple.  This module makes using Redis simple. 
+This module makes using Redis simple. 
 
 The module contains an embedded redis server that it will automatically 
 configure and start when the redis bindings are accessed. 
@@ -18,11 +18,14 @@ without modification.
 
 Usage
 -----
-redislite provides enhanced versions of the redis.Redis() and redis.StrictRedis() classes.
+redislite provides enhanced versions of the redis.Redis() and 
+redis.StrictRedis() classes.
 
-These enhanced classes take the same arguments as they're corresponding redis classes.
+These enhanced classes take the same arguments as they're corresponding redis 
+classes.
 
-Both enhanced classes accept one additional optional argument, which is the filename to use for the redis.db file.
+Both enhanced classes accept one additional optional argument, which is the 
+filename to use for the redis.db file.
 
 These enhanced classes provide the following additional functionality:
 
@@ -34,7 +37,8 @@ These enhanced classes provide the following additional functionality:
 * If the db argument is passed and there is another redislite object using that db, it will create a new connection to that redislite instance.
 * The redis server for a redislite object is shutdown and it's configuration is deleted when the object is cleaned up.
     
-redislite also provides functions to MonkeyPatch the redis.Redis and redis.StrictRedis classes to use redislite.
+redislite also provides functions to MonkeyPatch the redis.Redis and 
+redis.StrictRedis classes to use redislite.
     
 Example
 -------
@@ -58,7 +62,7 @@ Here we open a python shell and set a key in our embedded redis db
 
 Here we open the same redis db and access the key we created during the last run
 
-    (testvenv)airreport-lm:redislite dhubbard$ python
+    (testvenv)redislite dhubbard$ python
     Python 2.7.5 (default, Mar  9 2014, 22:15:05)
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
@@ -71,9 +75,11 @@ Here we open the same redis db and access the key we created during the last run
     >>> quit()
     $
 
-It's also possible to MonkeyPatch the normal redis classes to allow modules that use redis to use the redislite classes.  Here we patch redis and use the redis_collections module.
+It's also possible to MonkeyPatch the normal redis classes to allow modules 
+that use redis to use the redislite classes.  Here we patch redis and use the 
+redis_collections module.
 
-    (py27)airreport-lm:redislite dhubbard$ python
+    (py27)redislite dhubbard$ python
     Python 2.7.5 (default, Mar  9 2014, 22:15:05)
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
