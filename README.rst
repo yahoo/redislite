@@ -2,6 +2,9 @@
 redislite
 ===============================
 
+.. image:: https://travis-ci.org/dwighthubbard/redislite.svg?branch=master
+    :target: https://travis-ci.org/dwighthubbard/redislite
+    
 .. image:: https://pypip.in/version/redislite/badge.svg
    :target: https://pypi.python.org/pypi/redislite
 
