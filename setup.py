@@ -111,7 +111,7 @@ args = {
     'version': metadata['version'],
     'author': 'dhubbard',
     'author_email': 'dhubbard',
-    'url': 'http://git.corp.yahoo.com/python/yahoo.contrib.redislite',
+    'url': 'https://github.com/yahoo/redislite',
     'license': 'License :: OSI Approved :: BSD License',
     'packages': ['redislite'],
     'long_description': 'Redis packaged inside a python package',
