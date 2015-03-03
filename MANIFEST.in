@@ -1,0 +1,24 @@
+# Copyright (c) 2015, Yahoo Inc.
+# Copyrights licensed under the New BSD License
+# See the accompanying LICENSE.txt file for terms.
+
+# metadata
+include README.rst
+
+graft redis.submodule
+
+graft redis.submodule/deps
+include redis.submodule/deps/Makefile
+graft redis.submodule/deps/hiredis
+graft redis.submodule/deps/jemalloc
+graft redis.submodule/deps/linenoise
+graft redis.submodule/deps/lua
+include redis.submodule/deps/update-jemalloc.sh
+
+graft redis.submodule/src
+graft redis.submodule/tests
+graft redis.submodule/utils
+
+include src/dummy.c
+
+exclude *dummy.o
