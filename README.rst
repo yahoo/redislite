@@ -14,8 +14,10 @@ redislite
 .. image:: https://pypip.in/license/redislite/badge.svg
     :target: https://pypi.python.org/pypi/redislite/
 
-.. image:: https://coveralls.io/repos/dwighthubbard/redislite/badge.svg?branch=dwighthubbard-coveralls
-  :target: https://coveralls.io/r/dwighthubbard/redislite?branch=dwighthubbard-coveralls
+.. image:: https://coveralls.io/repos/yahoo/redislite/badge.svg
+  :target: https://coveralls.io/r/yahoo/redislite
+
+
 
 
 Description
