@@ -20,6 +20,6 @@ graft redis.submodule/tests
 graft redis.submodule/utils
 
 include src/dummy.c
-include redislite/package_metadata.json
+include package_metadata.json
 
 exclude *dummy.o

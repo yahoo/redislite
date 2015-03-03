@@ -21,8 +21,8 @@ revision = len(os.popen('git rev-list HEAD 2>/dev/null').readlines())
 if revision > 0:
     # We're in a git repo, so not the installed package archive so we
     # want to generate a new package version
-    if os.path.exists('redislite/package_metadata.json'):
-        os.remove('redislite/package_metadata.json')
+    if os.path.exists('package_metadata.json'):
+        os.remove('package_metadata.json')
 if 'TRAVIS_BUILD_NUMBER' in os.environ.keys():
     revision = os.environ['TRAVIS_BUILD_NUMBER'].strip()
 metadata = {
@@ -172,8 +172,8 @@ if __name__ == '__main__':
     logger.debug('Building for platform: %s', distutils.util.get_platform())
     # We're being run from the command line so call setup with our arguments
 
-    if os.path.isfile('redislite/package_metadata.json'):
-        metadata = json.loads('redislite/package_metadata.json')
+    if os.path.isfile('package_metadata.json'):
+        metadata = json.loads('package_metadata.json')
     else:
-        json.dump(metadata, open('redislite/package_metadata.json', 'w'))
+        json.dump(metadata, open('package_metadata.json', 'w'))
     setup(**setup_arguments)
