@@ -31,6 +31,11 @@ metadata = {
 }
 
 
+def readme():
+    with open('README.md') as f:
+        return f.read()
+
+
 class build_redis(build):
     def run(self):
         # run original build code
@@ -109,14 +114,14 @@ class InstallRedis(install):
 args = {
     'name': 'redislite',
     'version': metadata['version'],
-    'author': 'dhubbard',
-    'author_email': 'dhubbard',
+    'author': 'Dwight Hubbard',
+    'author_email': 'dhubbard@yahoo-inc.com',
     'url': 'https://github.com/yahoo/redislite',
     'license': 'License :: OSI Approved :: BSD License',
     'packages': ['redislite'],
-    'long_description': 'Redis packaged inside a python package',
     'description': 'Redis built into a python package',
     'install_requires': ['redis', 'psutil'],
+    'long_description': readme(),
     'classifiers': [
             'Development Status :: 3 - Alpha',
             'Environment :: Console',

@@ -4,6 +4,7 @@
 
 # metadata
 include README.rst
+include README.md
 
 graft redis.submodule
 
