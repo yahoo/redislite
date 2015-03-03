@@ -5,6 +5,12 @@ redislite
 .. image:: https://travis-ci.org/dwighthubbard/redislite.svg?branch=master
     :target: https://travis-ci.org/dwighthubbard/redislite
     
+.. image:: https://coveralls.io/repos/yahoo/redislite/badge.svg
+  :target: https://coveralls.io/r/yahoo/redislite
+
+.. image:: https://pypip.in/download/redislite/badge.svg
+    :target: https://pypi.python.org/pypi/redislite/
+    
 .. image:: https://pypip.in/version/redislite/badge.svg
    :target: https://pypi.python.org/pypi/redislite
 
@@ -13,11 +19,6 @@ redislite
 
 .. image:: https://pypip.in/license/redislite/badge.svg
     :target: https://pypi.python.org/pypi/redislite/
-
-.. image:: https://coveralls.io/repos/yahoo/redislite/badge.svg
-  :target: https://coveralls.io/r/yahoo/redislite
-
-
 
 
 Description
