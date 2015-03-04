@@ -10,9 +10,11 @@ matrix:
     - env: TOX_ENV=pypy
 install:
   - sudo apt-get update -qq
-  - pip install --upgrade pip setuptools tox virtualenv
+  - pip install --upgrade pip setuptools tox virtualenv coveralls
 script:
   - tox -v -v -e $TOX_ENV
+after_success:
+  coveralls
 after_failure:
   - for X in .tox/$TOX_ENV/log/*; do echo "$X\n"; cat "$X"; echo "\n\n"; done
   - echo "pip.log\n"; cat $HOME/.pip/pip.log
