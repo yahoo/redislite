@@ -80,4 +80,4 @@ pip-delete-this-directory.txt
 __pycache__/
 *.py[cod]
 .idea/
-
+redislite/package_metadata.json

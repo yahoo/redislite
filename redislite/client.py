@@ -1,17 +1,6 @@
 # Copyright (c) 2015, Yahoo Inc.
 # Copyrights licensed under the New BSD License
 # See the accompanying LICENSE.txt file for terms.
-from __future__ import print_function
-import atexit
-import json
-import logging
-import os
-import redis
-import shutil
-import signal
-import tempfile
-import time
-from . import configuration
 """
 Redislite client
 
@@ -20,6 +9,17 @@ StrictRedis() classes.  These classes will set up and run redis on access and
 will shutdown and clean up the redis-server when deleted.  Otherwise they are
 functionally identical to the redis.Redis() and redis.StrictRedis() classes.
 """
+import atexit
+import json
+import logging
+import os
+import redis
+import shutil
+import signal
+import subprocess
+import tempfile
+import time
+from . import configuration
 
 
 logger = logging.getLogger(__name__)
@@ -113,28 +113,25 @@ class RedisMixin(object):
         )
         fh.close()
 
-        command = 'redis-server %s' % config_file
-        logger.debug('Running: %s', command)
-        rc = os.system(command) >> 8
+        command = ['redis-server', config_file]
+        logger.debug('Running: %s', ' '.join(command))
+        rc = subprocess.call(command)
         if rc:  # pragma: no cover
             raise RedisLiteException('The binary redis-server failed to start')
 
         # Wait for Redis to start
         timeout = True
-        for i in range(0, self.start_timeout):
+        for i in range(0, self.start_timeout*10):
             if os.path.exists(self.socket_file):
                 timeout = False
                 break
-            time.sleep(1)
+            time.sleep(.1)
         if timeout:  # pragma: no cover
             raise RedisLiteException(
                 'The redis-server process failed to start'
             )
 
         if not os.path.exists(self.socket_file):  # pragma: no cover
-            os.system('ps auxwwww | grep redis-server')
-            if os.path.exists(self.pidfile):
-                os.system('lsof -p %s' % open(self.pidfile).read().strip())
             raise RedisLiteException(
                 'Redis socket file %s is not present' % self.socket_file
             )
@@ -247,10 +244,10 @@ class RedisMixin(object):
             return int(pid)
         return None  # pragma: no cover
 
+
 class Redis(RedisMixin, redis.Redis):
     pass
 
 
 class StrictRedis(RedisMixin, redis.StrictRedis):
     pass
-
