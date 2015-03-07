@@ -123,7 +123,7 @@ args = {
     'install_requires': ['redis', 'psutil'],
     'long_description': readme(),
     'classifiers': [
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 4 - Beta',
             'Environment :: Console',
             'Intended Audience :: Developers',
             'License :: OSI Approved :: BSD License',
