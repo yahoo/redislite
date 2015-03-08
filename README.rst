@@ -20,6 +20,9 @@ redislite
 .. image:: https://pypip.in/license/redislite/badge.svg
     :target: https://pypi.python.org/pypi/redislite/
 
+.. image:: https://readthedocs.org/projects/redislite/badge/?version=latest
+    :target: https://readthedocs.org/projects/redislite/?badge=latest
+    :alt: Documentation Status
 
 Description
 -----------
