@@ -15,7 +15,7 @@ if os.path.exists(_metadata_file):  # pragma: no cover
         _package_metadata = json.load(fh)
         __version__ = _package_metadata['version']
 else:
-    __version__ = '0.0.0'
+    __version__ = '0.0.0'  # pragma: no cover
 
 
 __all__ = ['client', 'configuration', 'patch']
