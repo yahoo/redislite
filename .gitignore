@@ -47,7 +47,7 @@ output/*.html
 output/*/index.html
 
 # Sphinx
-doc/build
+docs/build
 
 # pbr generates these
 AUTHORS
@@ -62,6 +62,8 @@ AUTHORS
 
 # Sphinx documentation
 docs/_build/
+docs/build
+build/
 
 # PyBuilder
 target/
