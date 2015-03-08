@@ -15,20 +15,9 @@ from subprocess import call
 
 
 logger = logging.getLogger(__name__)
-METADATA_FILE = 'redislite/package_metadata.json'
+METADATA_FILENAME = 'redislite/package_metadata.json'
 BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
-revision = len(os.popen('git rev-list HEAD 2>/dev/null').readlines())
-if revision > 0:
-    # We're in a git repo, so not the installed package archive so we
-    # want to generate a new package version
-    if os.path.exists(METADATA_FILE):
-        os.remove(METADATA_FILE)
-if 'TRAVIS_BUILD_NUMBER' in os.environ.keys():
-    revision = os.environ['TRAVIS_BUILD_NUMBER'].strip()
-metadata = {
-    'version': '1.0.%s' % revision
-}
 
 
 def readme():
@@ -106,7 +95,7 @@ class InstallRedis(install):
 #  without running setup() to allow external scripts to see the setup settings.
 args = {
     'name': 'redislite',
-    'version': metadata['version'],
+    'version': '1.0.32',
     'author': 'Dwight Hubbard',
     'author_email': 'dhubbard@yahoo-inc.com',
     'url': 'https://github.com/yahoo/redislite',
@@ -114,6 +103,7 @@ args = {
     'packages': ['redislite'],
     'description': 'Redis built into a python package',
     'install_requires': ['redis', 'psutil'],
+    'requires': ['redis', 'psutil'],
     'long_description': readme(),
     'classifiers': [
             'Development Status :: 4 - Beta',
@@ -165,14 +155,77 @@ if os.path.isdir('scripts'):
     ]
 
 
+class Git(object):
+    version_list = ['0', '7', '0']
+
+    def __init__(self, version=None):
+        if version:
+            self.version_list = version.split('.')
+
+    @property
+    def version(self):
+        """
+        Generate a Unique version value from the git information
+        :return:
+        """
+        git_rev = len(os.popen('git rev-list HEAD').readlines())
+        if git_rev != 0:
+            self.version_list[-1] = '%d' % git_rev
+        version = '.'.join(self.version_list)
+        return version
+
+    @property
+    def branch(self):
+        """
+        Get the current git branch
+        :return:
+        """
+        return os.popen('git rev-parse --abbrev-ref HEAD').read().strip()
+
+    @property
+    def hash(self):
+        """
+        Return the git hash for the current build
+        :return:
+        """
+        return os.popen('git rev-parse HEAD').read().strip()
+
+    @property
+    def origin(self):
+        """
+        Return the fetch url for the git origin
+        :return:
+        """
+        for item in os.popen('git remote -v'):
+            split_item = item.strip().split()
+            if split_item[0] == 'origin' and split_item[-1] == '(push)':
+                return split_item[1]
+
+
+def get_and_update_metadata():
+    """
+    Get the package metadata or generate it if missing
+    :return:
+    """
+    if not os.path.exists('.git') and os.path.exists(METADATA_FILENAME):
+        with open(METADATA_FILENAME) as fh:
+            metadata = json.load(fh)
+    else:
+        git = Git(version=setup_arguments['version'])
+        metadata = {
+            'version': git.version
+        }
+        with open(METADATA_FILENAME, 'w') as fh:
+            json.dump(metadata, fh)
+    return metadata
+
+
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     logger.debug('Building for platform: %s', distutils.util.get_platform())
-    # We're being run from the command line so call setup with our arguments
 
-    if os.path.isfile(METADATA_FILE):
-        metadata = json.load(open(METADATA_FILE))
-    else:
-        json.dump(metadata, open(METADATA_FILE, 'w'))
+    metadata = get_and_update_metadata()
+    setup_arguments['version'] = metadata['version']
+
     setup(**setup_arguments)
