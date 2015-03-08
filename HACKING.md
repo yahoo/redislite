@@ -17,6 +17,11 @@ Testing
 Any changes to source code should be tested, both for regression and for
 validation of new code.
 
+All tests can be run using the tox tool, install it using the command:
+
+    pip install tox
+
+
 * Check for [pep8] conformance.
 * Check for general python issues with [pylint] or [flake8]
 * Working unit tests are required for all code that adds new functionality.

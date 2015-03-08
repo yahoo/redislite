@@ -44,8 +44,6 @@ class build_redis(build):
         # build Redis
         logger.debug('Running build_redis')
 
-        build_path = os.path.abspath(self.build_temp)
-
         os.environ['CC'] = 'gcc'
         os.environ['PREFIX'] = REDIS_PATH
         cmd = [
@@ -53,11 +51,6 @@ class build_redis(build):
             'MALLOC=libc',
             'V=' + str(self.verbose),
         ]
-
-        #options = [
-        #    'DEBUG=n',
-        #]
-        #cmd.extend(options)
 
         targets = ['install']
         cmd.extend(targets)
@@ -158,10 +151,10 @@ args = {
     'ext_modules': [
         Extension('dummy', sources=['src/dummy.c'])
     ],
-    #'extras_require': {
-    #    ':sys_platform=="darwin"': [],
-    #    ':sys_platform=="linux"': [],
-    #}
+    # 'extras_require': {
+    #     ':sys_platform=="darwin"': [],
+    #     ':sys_platform=="linux"': [],
+    # }
 }
 setup_arguments = args
 

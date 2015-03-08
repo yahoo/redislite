@@ -57,8 +57,8 @@ def patch_redis_Redis(dbfile=None):
         Redis.dbdir = os.path.dirname(dbfile)
         Redis.dbfilename = os.path.basename(dbfile)
         Redis.settingregistryfile = os.path.join(
-                Redis.dbdir, Redis.dbfilename + '.settings'
-            )
+            Redis.dbdir, Redis.dbfilename + '.settings'
+        )
 
     original_classes['Redis'] = redis.Redis
     redis.Redis = Redis
@@ -121,8 +121,8 @@ def patch_redis_StrictRedis(dbfile=None):
         StrictRedis.dbdir = os.path.dirname(dbfile)
         StrictRedis.dbfilename = os.path.basename(dbfile)
         StrictRedis.settingregistryfile = os.path.join(
-                StrictRedis.dbdir, StrictRedis.dbfilename + '.settings'
-            )
+            StrictRedis.dbdir, StrictRedis.dbfilename + '.settings'
+        )
 
     original_classes['StrictRedis'] = redis.StrictRedis
     redis.StrictRedis = StrictRedis

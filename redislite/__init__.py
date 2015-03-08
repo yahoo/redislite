@@ -20,4 +20,4 @@ else:
 
 __all__ = ['client', 'configuration', 'patch']
 
-from .client import Redis, StrictRedis
+from .client import Redis, StrictRedis  # NOQA

@@ -76,14 +76,17 @@ class TestRedislite(unittest.TestCase):
         shutil.rmtree(temp_dir)
 
     def test_redislite_Redis_multiple_connections(self):
-        r = redislite.Redis()       # Generate a new redis server
-        s = redislite.Redis(r.db)   # Pass the first server's db to get a
-                                    # second connection
+        # Generate a new redis server
+        r = redislite.Redis()
+
+        # Pass the first server's db to get a second connection
+        s = redislite.Redis(r.db)
         r.set('key', 'value')
         result = s.get('key').decode(encoding='UTF-8')
         self.assertEqual(result, 'value')
-        self.assertEqual(r.pid, s.pid)  # Both objects should be using the same
-                                        # redis process.
+
+        # Both objects should be using the same redis process.
+        self.assertEqual(r.pid, s.pid)
 
     def test_redislite_Redis_cleanup(self):
         r = redislite.Redis()
@@ -112,7 +115,7 @@ class TestRedislite(unittest.TestCase):
         r = redis.Redis()
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
         s = redis.StrictRedis()
-        self.assertIsInstance(r.pid, int)    # Should have a redislite pid
+        self.assertIsInstance(s.pid, int)    # Should have a redislite pid
         redislite.patch.unpatch_redis()
 
     def test_redislite_double_patch_redis(self):
@@ -137,7 +140,6 @@ class TestRedislite(unittest.TestCase):
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
         self.assertEqual(r.pid, s.pid)  # Both instances should be talking to the same redis server
         redislite.patch.unpatch_redis()
-
 
     def test_redislite_Redis_create_redis_directory_tree(self):
         r = redislite.Redis()

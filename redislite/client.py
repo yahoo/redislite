@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 class RedisLiteException(Exception):
     pass
 
+
 class RedisLiteServerStartError(Exception):
     pass
+
 
 class RedisMixin(object):
     """
@@ -124,7 +126,7 @@ class RedisMixin(object):
 
         # Wait for Redis to start
         timeout = True
-        for i in range(0, self.start_timeout*10):
+        for i in range(0, self.start_timeout * 10):
             if os.path.exists(self.socket_file):
                 timeout = False
                 break
@@ -153,7 +155,7 @@ class RedisMixin(object):
             with open(self.settingregistryfile) as fh:
                 settings = json.load(fh)
             with open(settings['pidfile']) as fh:
-                pid = fh.read().strip()
+                pid = fh.read().strip()   # NOQA
 
             return True
         return False
