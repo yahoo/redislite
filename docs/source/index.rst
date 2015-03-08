@@ -3,15 +3,17 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to redislite's documentation!
-=====================================
+redislite's documentation
+=========================
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
 
-    topic/redis_configuration.rst
+   redislite_module.rst
+   topic/redislite_classes.rst
+   topic/redislite_patching.rst
 
 
 Indices and tables

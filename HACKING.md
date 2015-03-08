@@ -17,7 +17,12 @@ Testing
 Any changes to source code should be tested, both for regression and for
 validation of new code.
 
-* Check for [pep8] conformance.
+All tests can be run using the tox tool, install it using the command:
+
+    pip install tox
+
+
+* Check for [pep8] conformance by running `tox -e pep8` and correct any issues.
 * Check for general python issues with [pylint] or [flake8]
 * Working unit tests are required for all code that adds new functionality.
 
@@ -27,7 +32,8 @@ ensure your fork will automatically build correctly using the CI pipeline.
 CI Pipelines
 ------------
 Any new change branches should build correctly using CI prior to being
-submitted for upstream inclusion.
+submitted for upstream inclusion.  Local changes can be tested by running: `tox`
+in the git root directory.
 
 Submitting Code
 ---------------
@@ -47,10 +53,9 @@ submission only includes your new changes:
 
 ## Documentation
 
-Please create documentation in the ``doc/`` folder.
+Please create documentation in the ``docs/`` folder.
 
-Documentation should all be written in [markdown]. Although github does support 
-other formats it seems better just to stabilize on one.
+Documentation should all be written in [rst].
 
 ## Style
 
