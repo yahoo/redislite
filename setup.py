@@ -224,8 +224,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     logger.debug('Building for platform: %s', distutils.util.get_platform())
-    # We're being run from the command line so call setup with our arguments
 
     metadata = get_and_update_metadata()
+    setup_arguments['version'] = metadata['version']
 
     setup(**setup_arguments)
