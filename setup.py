@@ -221,7 +221,7 @@ def get_and_update_metadata():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     logger.debug('Building for platform: %s', distutils.util.get_platform())
 
