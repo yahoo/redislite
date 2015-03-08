@@ -207,7 +207,7 @@ def get_and_update_metadata():
     Get the package metadata or generate it if missing
     :return:
     """
-    if not os.path.exists('.git') and os.path.exists('hostlists/metadata.json'):
+    if not os.path.exists('.git') and os.path.exists(METADATA_FILENAME):
         with open(METADATA_FILENAME) as fh:
             metadata = json.load(fh)
     else:
