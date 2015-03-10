@@ -1,6 +1,5 @@
-===============================
 redislite
-===============================
+*********
 
 .. image:: https://travis-ci.org/dwighthubbard/redislite.svg?branch=master
     :target: https://travis-ci.org/dwighthubbard/redislite
@@ -21,11 +20,11 @@ redislite
     :target: https://pypi.python.org/pypi/redislite/
 
 .. image:: https://readthedocs.org/projects/redislite/badge/?version=latest
-    :target: https://readthedocs.org/projects/redislite/?badge=latest
+    :target: http://redislite.readthedocs.org/en/latest/
     :alt: Documentation Status
 
 Description
------------
+===========
 This module makes using Redis simple. 
 
 The module contains an embedded redis server that it will automatically 
@@ -35,11 +34,12 @@ It kills the embedded redis server and cleans up when the redislite object is
 deleted or the python interpreter exists.
 
 It also provides functions to patch the normal redis bindings module to use the
-redislite module so existing code that uses the redis bindings can be used 
+redislite module so existing code that uses the redis bindings can be used
 without modification.
 
+
 Usage
------
+=====
 redislite provides enhanced versions of the redis.Redis() and 
 redis.StrictRedis() classes.
 
@@ -63,16 +63,12 @@ redislite also provides functions to MonkeyPatch the redis.Redis and
 redis.StrictRedis classes to use redislite.
     
 Example
--------
+=======
 
 Here we open a python shell and set a key in our embedded redis db
 
 .. code-block:: python
 
-    $ python
-    Python 2.7.5 (default, Mar  9 2014, 22:15:05)
-    [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
-    Type "help", "copyright", "credits" or "license" for more information.
     >>> from redislite import Redis
     >>> redis_connection = Redis('/tmp/redis.db')
     >>> redis_connection.keys()
@@ -81,26 +77,17 @@ Here we open a python shell and set a key in our embedded redis db
     True
     >>> redis_connection.get('key')
     'value'
-    >>> quit()
-    $
-
 
 Here we open the same redis db and access the key we created during the last run
 
 .. code-block:: python
 
-    (testvenv)redislite dhubbard$ python
-    Python 2.7.5 (default, Mar  9 2014, 22:15:05)
-    [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
-    Type "help", "copyright", "credits" or "license" for more information.
     >>> from redislite import Redis
     >>> redis_connection = Redis('/tmp/redis.db')
     >>> redis_connection.keys()
     ['key']
     >>> redis_connection.get('key')
     'value'
-    >>> quit()
-    $
 
 It's also possible to MonkeyPatch the normal redis classes to allow modules 
 that use redis to use the redislite classes.  Here we patch redis and use the 
@@ -108,10 +95,6 @@ redis_collections module.
 
 .. code-block:: python
 
-    (py27)redislite dhubbard$ python
-    Python 2.7.5 (default, Mar  9 2014, 22:15:05)
-    [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
-    Type "help", "copyright", "credits" or "license" for more information.
     >>> import redislite.patch
     >>> redislite.patch.patch_redis()
     >>> import redis_collections
@@ -119,5 +102,8 @@ redis_collections module.
     >>> td['foo']='bar'
     >>> td.keys()
     ['foo']
-    >>> quit()
-    $
+
+More Information
+================
+
+There is more detailed information on the redislite documentation page at http://redislite.readthedocs.org/en/latest/
