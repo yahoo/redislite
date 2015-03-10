@@ -1,6 +1,5 @@
-===============================
 redislite
-===============================
+*********
 
 .. image:: https://travis-ci.org/dwighthubbard/redislite.svg?branch=master
     :target: https://travis-ci.org/dwighthubbard/redislite
@@ -21,11 +20,11 @@ redislite
     :target: https://pypi.python.org/pypi/redislite/
 
 .. image:: https://readthedocs.org/projects/redislite/badge/?version=latest
-    :target: https://readthedocs.org/projects/redislite/?badge=latest
+    :target: http://redislite.readthedocs.org/en/latest/
     :alt: Documentation Status
 
 Description
------------
+===========
 This module makes using Redis simple. 
 
 The module contains an embedded redis server that it will automatically 
@@ -35,11 +34,12 @@ It kills the embedded redis server and cleans up when the redislite object is
 deleted or the python interpreter exists.
 
 It also provides functions to patch the normal redis bindings module to use the
-redislite module so existing code that uses the redis bindings can be used 
+redislite module so existing code that uses the redis bindings can be used
 without modification.
 
+
 Usage
------
+=====
 redislite provides enhanced versions of the redis.Redis() and 
 redis.StrictRedis() classes.
 
@@ -63,7 +63,7 @@ redislite also provides functions to MonkeyPatch the redis.Redis and
 redis.StrictRedis classes to use redislite.
     
 Example
--------
+=======
 
 Here we open a python shell and set a key in our embedded redis db
 
@@ -121,3 +121,9 @@ redis_collections module.
     ['foo']
     >>> quit()
     $
+
+
+More Information
+================
+
+There is more detailed information on the redislite documentation page at http://redislite.readthedocs.org/en/latest/
