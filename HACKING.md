@@ -3,7 +3,7 @@ Contributing to redislite
 Redislite development occurs on github at:
 https://github.com/yahoo/redislite
 
-All development should occur on a branch from the redislite github repo.
+All development should occur on a fork or branch of the redislite github repo.
 
 Prior to submitting a pull request, please complete a <a href="https://yahoocla.herokuapp.com/">Yahoo CLA agreement</a>.
 
