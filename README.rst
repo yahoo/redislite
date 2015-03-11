@@ -1,8 +1,8 @@
 redislite
 *********
 
-.. image:: https://travis-ci.org/dwighthubbard/redislite.svg?branch=master
-    :target: https://travis-ci.org/dwighthubbard/redislite
+.. image:: https://travis-ci.org/yahoo/redislite.svg?branch=master
+    :target: https://travis-ci.org/yahoo/redislite
     
 .. image:: https://coveralls.io/repos/yahoo/redislite/badge.svg
   :target: https://coveralls.io/r/yahoo/redislite
