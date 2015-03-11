@@ -31,7 +31,7 @@ The module contains an embedded redis server that it will automatically
 configure and start when the redis bindings are accessed. 
 
 It kills the embedded redis server and cleans up when the redislite object is
-deleted or the python interpreter exists.
+deleted or the Python interpreter exists.
 
 It also provides functions to patch the normal redis bindings module to use the
 redislite module so existing code that uses the redis bindings can be used
@@ -65,7 +65,7 @@ redis.StrictRedis classes to use redislite.
 Example
 =======
 
-Here we open a python shell and set a key in our embedded redis db
+Here we open a Python shell and set a key in our embedded redis db
 
 .. code-block:: python
 
