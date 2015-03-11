@@ -1,5 +1,5 @@
 Redislite license and trademark information
--------------------------------------------
+===========================================
 
 Three clause BSD license
 ------------------------

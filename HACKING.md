@@ -51,13 +51,15 @@ submission only includes your new changes:
     ensure the evaluation and review of your code does not have common coding
     errors and decrease the human time to evaluate changes.
 
-## Documentation
+Documentation
+-------------
 
 Please create documentation in the ``docs/`` folder.
 
 Documentation should all be written in [rst].
 
-## Style
+Style
+-----
 
 * Please attempt to follow [pep8] for all code submitted.  This helps make
 code merges smaller and more managable.
