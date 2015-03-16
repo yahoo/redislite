@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
 
    redislite_module.rst
+   topic/using_with_existing_modules.rst
    topic/redislite_classes.rst
    topic/redislite_patching.rst
 
