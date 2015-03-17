@@ -1,6 +1,7 @@
 
-Using redislite with existing redis packages
-============================================
+Using redislite with existing python code
+=========================================
+
 The redislite patch functionality can be used to make many existing python
 modules that use redis to work with minimal modifications.
 

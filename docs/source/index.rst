@@ -3,22 +3,26 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-redislite's documentation
-=========================
+Redislite - Redis Easy to Use
+*****************************
 
-Contents:
+
+Table of Contents
+=================
 
 .. toctree::
    :maxdepth: 2
 
-   redislite_module.rst
-   topic/using_with_existing_modules.rst
-   topic/redislite_classes.rst
-   topic/redislite_patching.rst
+   topic/what_is_redislite
+   topic/redislite_design
+   topic/using_with_existing_modules
+   topic/redislite_module
+   topic/redislite_classes
+   topic/redislite_patching
 
 
 Indices and tables
-==================
+******************
 
 * :ref:`genindex`
 * :ref:`modindex`

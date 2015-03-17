@@ -75,6 +75,19 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(filename))
         shutil.rmtree(temp_dir)
 
+    def test_redislite_Redis_with_db_file_keyword(self):
+        temp_dir = tempfile.mkdtemp()
+        filename = os.path.join(temp_dir, 'redis.db')
+        self.assertFalse(os.path.exists(filename))
+        r = redislite.Redis(dbfilename=filename)
+        r.set('key', 'value')
+        result = r.get('key').decode(encoding='UTF-8')
+        self.assertEqual(result, 'value')
+        r.save()
+        r._cleanup()
+        self.assertTrue(os.path.exists(filename))
+        shutil.rmtree(temp_dir)
+
     def test_redislite_Redis_multiple_connections(self):
         # Generate a new redis server
         r = redislite.Redis()
