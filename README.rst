@@ -34,13 +34,22 @@ a redis server.
 Installation
 ============
 
-To install redislite, simply::
+To install redislite, simply:
+
+.. code-block::
+
     $ pip install redislite
 
-or using easy_install::
+or using easy_install:
+
+.. code-block::
+
     $ easy_install redislite
 
-of from source::
+or from source:
+
+.. code-block::
+
     $ python setup.py install
 
 
