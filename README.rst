@@ -25,11 +25,34 @@ redislite
 
 Description
 ===========
-This module makes using Redis simple.
+Self contained Python interface to the Redis key-value store.
 
 It makes it possible to use redis without the need to install and configure
 a redis server.
 
+
+Installation
+============
+
+To install redislite, simply::
+    $ pip install redislite
+
+or using easy_install::
+    $ easy_install redislite
+
+of from source::
+    $ python setup.py install
+
+
+Getting Started
+===============
+
+    >>> import redislite
+    >>> r = redis.StrictRedis()
+    >>> r.set('foo', 'bar')
+    True
+    >>> r.get('foo')
+    'bar'
 
 Usage
 =====
