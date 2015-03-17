@@ -103,6 +103,25 @@ redis_collections module.
     >>> td.keys()
     ['foo']
 
+
+Or the Walrus module
+
+.. code-block:: python
+
+    >>> from redislite.patch import patch_redis
+    >>> patch_redis('/tmp/walrus.db')
+    >>> from walrus import *
+    >>> db = Database()
+    >>> huey = db.Hash('huey')
+    >>> huey.update(color='white', temperament='ornery', type='kitty')
+    <Hash "huey": {'color': 'white', 'type': 'kitty', 'temperament': 'ornery'}>
+    >>> huey.keys()
+    ['color', 'type', 'temperament']
+    >>> 'color' in huey
+    True
+    >>> huey['color']
+    'white'
+
 More Information
 ================
 
