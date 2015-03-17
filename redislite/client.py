@@ -5,10 +5,10 @@
 Redislite client
 
 This module contains extended versions of the redis module :class:`Redis()` and
-:class:`StrictRedis()` classes.  These classes will set up and run redis on access and
-will shutdown and clean up the redis-server when deleted.  Otherwise they are
-functionally identical to the :class:`redis.Redis()` and :class:`redis.StrictRedis()`
-classes.
+:class:`StrictRedis()` classes.  These classes will set up and run redis on
+access and will shutdown and clean up the redis-server when deleted.  Otherwise
+they are functionally identical to the :class:`redis.Redis()` and
+:class:`redis.StrictRedis()` classes.
 """
 import atexit
 import json
@@ -34,6 +34,7 @@ class RedisLiteServerStartError(Exception):
     pass
 
 
+# noinspection PyTypeChecker
 class RedisMixin(object):
     """
     Extended version of the redis.Redis class with code to start/stop the
@@ -202,13 +203,27 @@ class RedisMixin(object):
             # noinspection PyArgumentList,PyPep8
             super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
+        db_filename = None
         if args:
-            self.dbfilename = os.path.basename(args[0])
-            self.dbdir = os.path.dirname(args[0])
+            db_filename = args[0]
+
+            # Remove our positional argument
+            args = args[1:]
+
+        if 'dbfilename' in kwargs.keys():
+            db_filename = kwargs['dbfilename']
+
+            # Remove our keyword argument
+            del kwargs['dbfilename']
+
+        if db_filename:
+            self.dbfilename = os.path.basename(db_filename)
+            self.dbdir = os.path.dirname(db_filename)
 
             self.settingregistryfile = os.path.join(
                 self.dbdir, self.dbfilename + '.settings'
             )
+            # Remove the argument before we pass it to the redis class
 
         if self._is_redis_running():
             self._load_setting_registry()
@@ -252,8 +267,8 @@ class RedisMixin(object):
 
 class Redis(RedisMixin, redis.Redis):
     """
-    This class provides an enhanced version of the :class:`redis.Redis()` class that uses an embedded redis-server
-    by default.
+    This class provides an enhanced version of the :class:`redis.Redis()` class
+    that uses an embedded redis-server by default.
 
 
     Example:
@@ -261,31 +276,37 @@ class Redis(RedisMixin, redis.Redis):
 
 
     Notes:
-        If the dbfilename argument is not provided each instance will get a different redis-server instance.
+        If the dbfilename argument is not provided each instance will get a
+        different redis-server instance.
 
 
     Args:
         dbfilename(str):
-            The name of the Redis db file to be used.  This argument is only used if the embedded redis-server is used.
-            The value of this argument is provided as the "dbfilename" setting in the embedded redis server
-            configuration.  This will result in the embedded redis server dumping it's database to this file on
-            exit/close.  This will also result in the embedded redis server using an existing redis database if the
-            file exists on start.
-            If this file exists and is in use by another redislite instance, this class will get
-            a reference to the existing running redis instance so both instances share the same redis-server process
+            The name of the Redis db file to be used.  This argument is only
+            used if the embedded redis-server is used.  The value of this
+            argument is provided as the "dbfilename" setting in the embedded
+            redis server configuration.  This will result in the embedded
+            redis server dumping it's database to this file on exit/close.
+            This will also result in the embedded redis server using an
+            existing redis rdb database if the file exists on start.
+            If this file exists and is in use by another redislite instance,
+            this class will get a reference to the existing running redis
+            instance so both instances share the same redis-server process
             and don't corrupt the db file.
 
     Kwargs:
         host(str):
-            The hostname or ip address of the redis server to connect to.  If this argument is not None, the
-            embedded redis server will not be used.  Defaults to None.
-        port(int): The
-            port number of the redis server to connect to.  If this argument is not None, the embedded
-            redis server will not be used.  Defaults to None.
+            The hostname or ip address of the redis server to connect to.  If
+            this argument is not None, the embedded redis server will not be
+            used.  Defaults to None.
+
+        port(int): The port number of the redis server to connect to.  If this
+            argument is not None, the embedded redis server will not be used.
+            Defaults to None.
 
     Returns:
-        A :class:`redis.Redis()` class object if the host or port arguments where set or a :class:`redislite.Redis()`
-        object otherwise.
+        A :class:`redis.Redis()` class object if the host or port arguments
+        where set or a :class:`redislite.Redis()` object otherwise.
 
     Raises:
         RedisLiteServerStartError
@@ -293,23 +314,24 @@ class Redis(RedisMixin, redis.Redis):
 
     Attributes:
         db(string):
-            The fully qualified filename associated with the redis dbfilename configuration setting.  This attribute
-            is read only.
+            The fully qualified filename associated with the redis dbfilename
+            configuration setting.  This attribute is read only.
 
         pid(int):
-            Pid of the running embedded redis server.
+            Pid of the running embedded redis server, this attribute is read
+            only.
 
         start_timeout(float):
-            Number of seconds to wait for the redis-server process to start before generating a
-            RedisLiteServerStartError exception.
+            Number of seconds to wait for the redis-server process to start
+            before generating a RedisLiteServerStartError exception.
     """
     pass
 
 
 class StrictRedis(RedisMixin, redis.StrictRedis):
     """
-    This class provides an enhanced version of the :class:`redis.StrictRedis()` class that uses an embedded redis-server
-    by default.
+    This class provides an enhanced version of the :class:`redis.StrictRedis()`
+    class that uses an embedded redis-server by default.
 
 
     Example:
@@ -317,31 +339,39 @@ class StrictRedis(RedisMixin, redis.StrictRedis):
 
 
     Notes:
-        If the dbfilename argument is not provided each instance will get a different redis-server instance.
+        If the dbfilename argument is not provided each instance will get a
+        different redis-server instance.
 
 
     Args:
         dbfilename(str):
-            The name of the Redis db file to be used.  This argument is only used if the embedded redis-server is used.
-            The value of this argument is provided as the "dbfilename" setting in the embedded redis server
-            configuration.  This will result in the embedded redis server dumping it's database to this file on
-            exit/close.  This will also result in the embedded redis server using an existing redis database if the
-            file exists on start.
-            If this file exists and is in use by another redislite instance, this class will get
-            a reference to the existing running redis instance so both instances share the same redis-server process
+            The name of the Redis db file to be used.  This argument is only
+            used if the embedded redis-server is used.  The value of this
+            argument is provided as the "dbfilename" setting in the embedded
+            redis server configuration.  This will result in the embedded redis
+            server dumping it's database to this file on
+            exit/close.  This will also result in the embedded redis server
+            using an existing redis database if the file exists on start.
+            If this file exists and is in use by another redislite instance,
+            this class will get a reference to the existing running redis
+            instance so both instances share the same redis-server process
             and don't corrupt the db file.
 
     Kwargs:
         host(str):
-            The hostname or ip address of the redis server to connect to.  If this argument is not None, the
-            embedded redis server will not be used.  Defaults to None.
+            The hostname or ip address of the redis server to connect to.  If
+            this argument is not None, the embedded redis server will not be
+            used.  Defaults to None.
+
         port(int): The
-            port number of the redis server to connect to.  If this argument is not None, the embedded
-            redis server will not be used.  Defaults to None.
+            port number of the redis server to connect to.  If this argument is
+            not None, the embedded redis server will not be used.  Defaults to
+            None.
 
     Returns:
-        A :class:`redis.StrictRedis()` class object if the host or port arguments where set or a
-        :class:`redislite.StrictRedis()` object otherwise.
+        A :class:`redis.StrictRedis()` class object if the host or port
+        arguments where set or a :class:`redislite.StrictRedis()` object
+        otherwise.
 
     Raises:
         RedisLiteServerStartError
@@ -349,14 +379,15 @@ class StrictRedis(RedisMixin, redis.StrictRedis):
 
     Attributes:
         db(string):
-            The fully qualified filename associated with the redis dbfilename configuration setting.  This attribute
-            is read only.
+            The fully qualified filename associated with the redis dbfilename
+            configuration setting.  This attribute is read only.
 
         pid(int):
-            Pid of the running embedded redis server.
+            Pid of the running embedded redis server, this attribute is read
+            only.
 
         start_timeout(float):
-            Number of seconds to wait for the redis-server process to start before generating a
-            RedisLiteServerStartError exception.
+            Number of seconds to wait for the redis-server process to start
+            before generating a RedisLiteServerStartError exception.
     """
     pass

@@ -25,42 +25,55 @@ redislite
 
 Description
 ===========
-This module makes using Redis simple. 
+Self contained Python interface to the Redis key-value store.
 
-The module contains an embedded redis server that it will automatically 
-configure and start when the redis bindings are accessed. 
+It makes it possible to use redis without the need to install and configure
+a redis server.
 
-It kills the embedded redis server and cleans up when the redislite object is
-deleted or the Python interpreter exists.
 
-It also provides functions to patch the normal redis bindings module to use the
-redislite module so existing code that uses the redis bindings can be used
-without modification.
+Installation
+============
 
+To install redislite, simply:
+
+.. code-block::
+
+    $ pip install redislite
+
+or using easy_install:
+
+.. code-block::
+
+    $ easy_install redislite
+
+or from source:
+
+.. code-block::
+
+    $ python setup.py install
+
+
+Getting Started
+===============
+
+    >>> import redislite
+    >>> r = redis.StrictRedis()
+    >>> r.set('foo', 'bar')
+    True
+    >>> r.get('foo')
+    'bar'
 
 Usage
 =====
 redislite provides enhanced versions of the redis.Redis() and 
-redis.StrictRedis() classes.
+redis.StrictRedis() classes that  take the same arguments as the corresponding
+redis classes and take one additional optional argument.  Which is the
+name of the redis rbd file to use.  If the argument is not provided it will
+create a new one.
 
-These enhanced classes take the same arguments as they're corresponding redis 
-classes.
-
-Both enhanced classes accept one additional optional argument, which is the 
-filename to use for the redis.db file.
-
-These enhanced classes provide the following additional functionality:
-
-* They configure and start and embedded copy of the redis server running on a unix domain socket in the redislist temp directory for the communication to the redis service.
-* TCP communication is disabled.
-* The classes have two additional attributes:
-    * db - The path to the db backing file for the redis instance.
-    * pid - The process id (pid) of the embedded redis server.
-* If the db argument is passed and there is another redislite object using that db, it will create a new connection to that redislite instance.
-* The redis server for a redislite object is shutdown and it's configuration is deleted when the object is cleaned up.
-    
 redislite also provides functions to MonkeyPatch the redis.Redis and 
-redis.StrictRedis classes to use redislite.
+redis.StrictRedis classes to use redislite, so existing python code that uses
+redis can use the redislite version.
     
 Example
 =======
