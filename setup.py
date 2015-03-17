@@ -99,7 +99,7 @@ args = {
     'author': 'Dwight Hubbard',
     'author_email': 'dhubbard@yahoo-inc.com',
     'url': 'https://github.com/yahoo/redislite',
-    'license': 'License :: OSI Approved :: BSD License',
+    'license': 'BSD License',
     'packages': ['redislite'],
     'description': 'Redis built into a python package',
     'install_requires': ['redis', 'psutil'],
