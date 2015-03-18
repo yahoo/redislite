@@ -111,7 +111,7 @@ args = {
             'Intended Audience :: Developers',
             'License :: OSI Approved :: BSD License',
             'Operating System :: MacOS :: MacOS X',
-            'Operting System :: POSIX :: BSD :: FreeBSD',
+            'Operating System :: POSIX :: BSD :: FreeBSD',
             'Operating System :: POSIX :: Linux',
             'Operating System :: POSIX :: SunOS/Solaris',
             'Operating System :: POSIX',
