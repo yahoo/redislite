@@ -95,11 +95,11 @@ class InstallRedis(install):
 #  without running setup() to allow external scripts to see the setup settings.
 args = {
     'name': 'redislite',
-    'version': '1.0.32',
+    'version': '1.0.62',
     'author': 'Dwight Hubbard',
     'author_email': 'dhubbard@yahoo-inc.com',
     'url': 'https://github.com/yahoo/redislite',
-    'license': 'BSD License',
+    'license': 'BSD',
     'packages': ['redislite'],
     'description': 'Redis built into a python package',
     'install_requires': ['redis', 'psutil'],
@@ -111,7 +111,7 @@ args = {
             'Intended Audience :: Developers',
             'License :: OSI Approved :: BSD License',
             'Operating System :: MacOS :: MacOS X',
-            'Operating System :: POSIX :: BSD :: FreeBSD',
+            'Operting System :: POSIX :: BSD :: FreeBSD',
             'Operating System :: POSIX :: Linux',
             'Operating System :: POSIX :: SunOS/Solaris',
             'Operating System :: POSIX',
