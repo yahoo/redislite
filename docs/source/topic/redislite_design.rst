@@ -8,11 +8,11 @@ These enhanced classes accept the same arguments as the corresponding redis
 classes.
 
 Both enhanced classes accept one additional optional argument, which is the
-filename to use for the redis.db file.
+filename to use for the redis rdb file.
 
 These enhanced classes provide the following additional functionality:
 
-* They configure and start and embedded copy of the redis server running on a unix domain socket in the redislist temp directory for the communication to the redis service.
+* They configure and start an embedded copy of the redis server running on a unix domain socket in the redislite temp directory for the communication to the redis service.
 * TCP communication is disabled.
 * The classes have two additional attributes:
     * db - The path to the db backing file for the redis instance.
