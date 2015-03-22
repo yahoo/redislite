@@ -68,7 +68,7 @@ Usage
 redislite provides enhanced versions of the redis.Redis() and 
 redis.StrictRedis() classes that  take the same arguments as the corresponding
 redis classes and take one additional optional argument.  Which is the
-name of the redis rbd file to use.  If the argument is not provided it will
+name of the redis rdb file to use.  If the argument is not provided it will
 create a new one.
 
 redislite also provides functions to MonkeyPatch the redis.Redis and 
