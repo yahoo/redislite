@@ -56,6 +56,8 @@ or from source:
 Getting Started
 ===============
 
+.. code-block:: python
+
     >>> import redislite
     >>> r = redis.StrictRedis()
     >>> r.set('foo', 'bar')
