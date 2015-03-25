@@ -59,7 +59,7 @@ Getting Started
 .. code-block:: python
 
     >>> import redislite
-    >>> r = redis.StrictRedis()
+    >>> r = redislite.StrictRedis()
     >>> r.set('foo', 'bar')
     True
     >>> r.get('foo')
