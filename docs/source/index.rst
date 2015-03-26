@@ -20,6 +20,8 @@ Table of Contents
    topic/redislite_classes
    topic/redislite_patching
 
+   topic/contributing
+
 
 Indices and tables
 ******************
