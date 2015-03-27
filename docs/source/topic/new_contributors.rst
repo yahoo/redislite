@@ -105,41 +105,6 @@ To see this report, run::
 
     tox
 
-CI Pipelines
-------------
-Any new change branches should build correctly using CI prior to being submitted
-for upstream inclusion.
-
-Local changes can be tested by running::
-
-    tox
-
-in the git root directory.
-
-When a pull request is submitted the travis-ci service will automatically run
-the tests on the code in the pull request and annotate the pull request with the
-results.
-
-Pull requests should never be submitted before the travis-ci pipeline indicates
-the tests all pass.
-
-
-Submitting Code
----------------
-To submit your code for inclusion upstream, do the following to ensure your
-submission only includes your new changes:
-
-1.  Make sure you have Completed a `Yahoo CLA Agreement <https://yahoocla.herokuapp.com>`_.
-2.  Perform a merge from the MASTER branch of the main redislite repository
-    into your fork.  This will ensure your pull request only includes your
-    changes and will allow you to deal with any upstream changes that affect
-    your code.
-3.  Clear up all PEP8 issues before submission.  This will ensure your
-    changesets only include code changes and not formatting changes.
-4.  Clear up or document exceptions for all PyLint/Flake8 issues.  This will
-    ensure the evaluation and review of your code does not have common coding
-    errors and decrease the human time to evaluate changes.
-
 [pep8]: http://www.python.org/dev/peps/pep-0008/
 [pylint]: http://pypi.python.org/pypi/pylint
 [markdown]: http://daringfireball.net/projects/markdown/
