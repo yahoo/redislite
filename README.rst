@@ -24,9 +24,14 @@ redislite
     :alt: Documentation Status
 
 
-.. image:: https://img.shields.io/badge/IRC-redislite-blue.svg
-    :target: http://webchat.freenode.net/?channels=%23redislite&uio=d4>
+.. image:: https://img.shields.io/badge/IRC-redislite-lightgrey.svg
+    :target: http://webchat.freenode.net/?channels=%23redislite&uio=d4
     :alt: IRC
+
+.. image:: https://img.shields.io/badge/Group-pythonredislite-lightgrey.svg
+    :target: https://groups.yahoo.com/neo/groups/pythonredislite/info
+    :alt: Yahoo Group pythonredislite
+
 
 
 Description
