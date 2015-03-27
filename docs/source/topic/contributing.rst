@@ -36,8 +36,8 @@ When a pull request is submitted, three automated checks will automatically run,
 
 As these checks run the pull request will be annotated with the results.  If any of these checks fail the issue found needs to be fixed before the pull request can be applied.
 
-.. figure:: images/pull_request.png
-   :scale: 50 %
+.. figure:: pull_request.png
+   :scale: 10%
    :alt: A successful pull request
 
    An example of a pull request that successfully passed all automated checks.
