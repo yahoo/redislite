@@ -19,10 +19,11 @@ redislite
 .. image:: https://img.shields.io/pypi/l/redislite.svg
     :target: https://pypi.python.org/pypi/redislite/
 
+---------------------------------------------------------------------
+
 .. image:: https://readthedocs.org/projects/redislite/badge/?version=latest
     :target: http://redislite.readthedocs.org/en/latest/
     :alt: Documentation Status
-
 
 .. image:: https://img.shields.io/badge/IRC-redislite-blue.svg
     :target: http://webchat.freenode.net/?channels=%23redislite&uio=d4
