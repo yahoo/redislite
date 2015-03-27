@@ -1,3 +1,5 @@
+Code Documentation
+******************
 
 Module
 ======
@@ -9,3 +11,18 @@ Module
     :show-inheritance:
 .. moduleauthor:: Dwight Hubbard <dhubbard@yahoo-inc.com>
 .. sectionauthor:: Dwight Hubbard <dhubbard@yahoo-inc.com>
+
+Classes
+=======
+
+.. autoclass:: redislite.Redis
+   :members:
+
+.. autoclass:: redislite.StrictRedis
+   :members:
+
+
+Functions to patch the redis module
+===================================
+.. automodule:: redislite.patch
+    :members:
