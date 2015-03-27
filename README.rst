@@ -9,9 +9,9 @@ redislite
 
 .. image:: https://img.shields.io/pypi/dm/redislite.svg
     :target: https://pypi.python.org/pypi/redislite/
-    
-.. image:: https://pypip.in/version/redislite/badge.svg
-   :target: https://pypi.python.org/pypi/redislite
+
+.. image:: https://img.shields.io/pypi/v/redislite.svg
+    :target: https://pypi.python.org/pypi/redislite/
 
 .. image:: https://pypip.in/py_versions/redislite/badge.svg
     :target: https://pypi.python.org/pypi/redislite/
