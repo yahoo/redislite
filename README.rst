@@ -13,7 +13,7 @@ redislite
 .. image:: https://img.shields.io/pypi/v/redislite.svg
     :target: https://pypi.python.org/pypi/redislite/
 
-.. image:: https://pypip.in/py_versions/redislite/badge.svg
+.. image:: https://img.shields.io/badge/python-2.7,3.4,pypy-blue.svg
     :target: https://pypi.python.org/pypi/redislite/
 
 .. image:: https://img.shields.io/pypi/l/redislite.svg
