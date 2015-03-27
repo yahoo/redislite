@@ -11,7 +11,6 @@ The redislite project always needs more people to help others. As soon as you le
 * Write unit tests.
 
 
-
 .. _pythonredislitegroup: https://groups.yahoo.com/neo/groups/pythonredislite/info
 
 .. _pythonreddislite: pythonredislite-subscribe@yahoogroups.com

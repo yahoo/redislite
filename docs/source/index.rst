@@ -21,7 +21,7 @@ Table of Contents
    topic/redislite_patching
 
    topic/contributing
-
+   topic/new_contributors
 
 Indices and tables
 ******************
