@@ -17,6 +17,7 @@ Table of Contents
    topic/redislite_design
    topic/using_with_existing_modules
    topic/redislite_module
+   topic/command_line
 
    topic/contributing
    topic/new_contributors
