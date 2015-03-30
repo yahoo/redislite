@@ -47,15 +47,17 @@ Some things to look for:
 
 Write some documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~
-The redislite documentation is good but it can always be improved. Did you find a typo? Do you think that something should be clarified? Go ahead and update the documentation in the docs/source directory and submit a pull request.
-See also the guide on Writing documentation, in particular the tips for Improving the documentation.
+The redislite documentation is good but it can always be improved. Did you find a typo? Do you think that something
+should be clarified? Go ahead and update the documentation in the docs/source directory.
 
 Once your documentation changes have been made, run the following to generate the html documentation.::
 
     tox -e build_docs
 
-Then open the ``build/sphinx/html/index.html`` file in your web browser to ensure the generated documentation looks correct.
+Then open the ``build/sphinx/html/index.html`` file in your web browser to ensure the generated documentation looks
+correct.
 
+One the documentation looks correct, go ahead and submit a pull request.
 
 Testing
 -------
@@ -70,9 +72,9 @@ All tests can be run using the tox tool without any arguments::
 
 Style Check
 ~~~~~~~~~~~
-Code submitted to `redislite` should be compliant with the python [pep8] style guide.
+Code submitted to :mod:`redislite` should be compliant with the python pep8_ style guide.
 
-Prior to submitting code, check for [pep8] conformance by running::
+Prior to submitting code, check for pep8_ conformance by running::
 
     tox -e pep8
 
@@ -80,7 +82,7 @@ Then fix any issues.
 
 Check Code for Common Errors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Before submitting a pull request it's a good idea to run a code analysis tool to identify any common errors and indicators of bad code.  Using python tools such as [pylint] or [flake8].
+Before submitting a pull request it's a good idea to run a code analysis tool to identify any common errors and indicators of bad code.  Using python tools such as pylint_ or flake8.
 
 This can be done by running::
 
@@ -105,9 +107,9 @@ To see this report, run::
 
     tox
 
-[pep8]: http://www.python.org/dev/peps/pep-0008/
-[pylint]: http://pypi.python.org/pypi/pylint
-[markdown]: http://daringfireball.net/projects/markdown/
-[rst]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
-[fork]: https://guides.github.com/activities/forking/
 
+
+.. _pep8: http://www.python.org/dev/peps/pep-0008/
+.. _pylint: http://pypi.python.org/pypi/pylint
+.. _rst: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
+.. _fork: https://guides.github.com/activities/forking/

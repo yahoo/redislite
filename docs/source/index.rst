@@ -5,7 +5,9 @@
 
 Redislite - Redis Easy to Use
 *****************************
+Redislite provides a self-configuring Redis Key-Value store in a Python module.
 
+This makes it possible to use Redis without the need to install and configure a redis server.
 
 Table of Contents
 =================
@@ -17,6 +19,7 @@ Table of Contents
    topic/redislite_design
    topic/using_with_existing_modules
    topic/redislite_module
+   topic/command_line
 
    topic/contributing
    topic/new_contributors
