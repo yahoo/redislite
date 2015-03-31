@@ -42,7 +42,24 @@ Self contained Python interface to the Redis key-value store.
 It makes it possible to use redis without the need to install and configure
 a redis server.
 
+Requirements
+------------
+The redislite module requires Python 2.7 or higher.
 
+Make sure Python development headers are available when installing redislite. 
+
+On Ubuntu/Debian systems, install them with:
+
+.. code-block::
+
+    apt-get install python-dev.
+
+On Redhat/Fedora systems, install them with:
+
+.. code-block::
+
+    yum install python-devel
+    
 Installation
 ============
 
