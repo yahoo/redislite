@@ -60,6 +60,13 @@ On Redhat/Fedora systems, install them with:
 
     yum install python-devel
     
+On Mac OSX you will need the XCode command line utilities installed.  If you do not have xcode installed on recent OSX
+releases they can be installed by running:
+
+.. code-block::
+
+    xcode-select --install
+    
 Installation
 ============
 
