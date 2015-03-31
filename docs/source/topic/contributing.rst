@@ -1,7 +1,5 @@
 Contributing to redislite
 =========================
-
-
 The redislite project always needs more people to help others. As soon as you learn redislite, you can contribute in many ways:
 
 * Join the `pythonredislite group <https://groups.yahoo.com/neo/groups/pythonredislite/info>`_ or the pythonreddislite_ mailing list and answer questions.
@@ -16,13 +14,15 @@ To submit your code for inclusion upstream, do the following to ensure your
 submission only includes your new changes:
 
 1.  Make sure you have Completed a `Yahoo CLA Agreement <https://yahoocla.herokuapp.com>`_.
-2.  Perform a merge from the MASTER branch of the main redislite repository
-    into your fork.  This will ensure your pull request only includes your
+2.  Redislite development occurs on github at: https://github.com/yahoo/redislite.  All 
+    development should occur on a fork of the redislite github repo.
+3.  Prior to submitting a pull request, perform a merge from the MASTER branch of the main
+    redislite repository into your fork.  This will ensure your pull request only includes your
     changes and will allow you to deal with any upstream changes that affect
     your code.
-3.  Clear up all PEP8 issues before submission.  This will ensure your
-    changesets only include code changes and not formatting changes.
-4.  Clear up or document exceptions for all PyLint/Flake8 issues.  This will
+4.  Clear up all PEP8 issues before submission.  This will ensure your changesets only 
+    include code changes and not formatting changes.
+5.  Clear up or document exceptions for all PyLint/Flake8 issues.  This will
     ensure the evaluation and review of your code does not have common coding
     errors and decrease the human time to evaluate changes.
 
