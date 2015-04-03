@@ -4,6 +4,8 @@ env:
   - TOX_ENV=py27
   - TOX_ENV=py34
   - TOX_ENV=pypy
+notifications:
+  irc: "chat.freenode.net#redislite"
 matrix:
   fast_finish: true
   allow_failures:
