@@ -52,7 +52,7 @@ On Ubuntu/Debian systems, install them with:
 
 .. code-block::
 
-    apt-get install python-dev.
+    apt-get install python-dev
 
 On Redhat/Fedora systems, install them with:
 
