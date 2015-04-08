@@ -188,6 +188,14 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(test_db))
         os.remove(test_db)
 
+    def test_metadata(self):
+        self.assertIsInstance(redislite.__version__, str)
+        self.assertIsInstance(redislite.__git_version__, str)
+        self.assertIsInstance(redislite.__git_origin__, str)
+        self.assertIsInstance(redislite.__git_branch__, str)
+        self.assertIsInstance(redislite.__git_hash__, str)
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     test_suite = unittest.TestLoader().loadTestsFromTestCase(TestRedislite)
