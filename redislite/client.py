@@ -216,6 +216,9 @@ class RedisMixin(object):
             # Remove our keyword argument
             del kwargs['dbfilename']
 
+        if db_filename and db_filename == os.path.basename(db_filename):
+            db_filename = os.path.join(os.getcwd(), db_filename)
+
         if db_filename:
             self.dbfilename = os.path.basename(db_filename)
             self.dbdir = os.path.dirname(db_filename)
@@ -223,7 +226,6 @@ class RedisMixin(object):
             self.settingregistryfile = os.path.join(
                 self.dbdir, self.dbfilename + '.settings'
             )
-            # Remove the argument before we pass it to the redis class
 
         if self._is_redis_running():
             self._load_setting_registry()

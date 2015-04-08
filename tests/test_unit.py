@@ -168,6 +168,25 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(r.pidfile)
         self.assertGreater(r.pid, 0)
 
+    def test_redislite_db_file_cwd_args(self):
+        test_db = 'test_unit_redis.db'
+        if os.path.exists(test_db):
+            os.remove(test_db)
+        r = redislite.Redis(test_db)
+        r.set('key', 'value')
+        r.save()
+        self.assertTrue(os.path.exists(test_db))
+        os.remove(test_db)
+
+    def test_redislite_db_file_cwd_kw(self):
+        test_db = 'test_unit_redis.db'
+        if os.path.exists(test_db):
+            os.remove(test_db)
+        r = redislite.Redis(dbfilename=test_db)
+        r.set('key', 'value')
+        r.save()
+        self.assertTrue(os.path.exists(test_db))
+        os.remove(test_db)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
