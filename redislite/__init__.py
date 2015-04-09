@@ -42,6 +42,8 @@ else:   # pragma: no cover
     __git_branch__ = str("")
     __git_hash__ = str("")
 
+__source_url__ = 'https://github.com/yahoo/redislite/tree/' + __git_hash__
+
 
 __all__ = ['client', 'configuration', 'patch']
 
