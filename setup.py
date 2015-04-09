@@ -214,6 +214,10 @@ def get_and_update_metadata():
     else:
         git = Git(version=setup_arguments['version'])
         metadata = {
+            'git_version': git.version,
+            'git_origin': git.origin,
+            'git_branch': git.branch,
+            'git_hash': git.hash,
             'version': git.version
         }
         with open(METADATA_FILENAME, 'w') as fh:

@@ -27,12 +27,20 @@ _metadata_file = os.path.join(
     'package_metadata.json'
 )
 
-if os.path.exists(_metadata_file):  # pragma: no cover
+if os.path.exists(_metadata_file):
     with open(_metadata_file) as fh:
         _package_metadata = json.load(fh)
-        __version__ = _package_metadata['version']
-else:
-    __version__ = '0.0.0'  # pragma: no cover
+        __version__ = str(_package_metadata['version'])
+        __git_version__ =  str(_package_metadata['git_version'])
+        __git_origin__ = str(_package_metadata['git_origin'])
+        __git_branch__ = str(_package_metadata['git_branch'])
+        __git_hash__ = str(_package_metadata['git_hash'])
+else:   # pragma: no cover
+    __version__ = str('0.0.0')
+    __git_version__ = str("")
+    __git_origin__ = str("")
+    __git_branch__ = str("")
+    __git_hash__ = str("")
 
 
 __all__ = ['client', 'configuration', 'patch']
