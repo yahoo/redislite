@@ -112,7 +112,7 @@ class InstallRedis(install):
         if os.path.exists(md_file):
             with open(md_file) as fh:
                 md = json.load(fh)
-                md['redis_bin'] = install_scripts
+                md['redis_bin'] = [os.path.join(install_scripts,'redis-server')]
             print('new metadata: %s' % md)
             with open(md_file, 'w') as fh:
                 json.dump(md, fh, indent=4)
