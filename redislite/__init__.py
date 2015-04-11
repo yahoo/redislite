@@ -27,6 +27,14 @@ _metadata_file = os.path.join(
     'package_metadata.json'
 )
 
+__version__ = str('0.0.0')
+__git_version__ = str("")
+__git_origin__ = str("")
+__git_branch__ = str("")
+__git_hash__ = str("")
+__source_url__ = str('')
+__redis_server_info__ = {}
+
 if os.path.exists(_metadata_file):
     with open(_metadata_file) as fh:
         _package_metadata = json.load(fh)
@@ -41,15 +49,6 @@ if os.path.exists(_metadata_file):
         __source_url__ = __git_base_url__ + '/tree/' + __git_hash__
         __redis_executable__ = _package_metadata['redis_bin']
         __redis_server_info__ = _package_metadata['redis_server']
-
-else:   # pragma: no cover
-    __version__ = str('0.0.0')
-    __git_version__ = str("")
-    __git_origin__ = str("")
-    __git_branch__ = str("")
-    __git_hash__ = str("")
-    __source_url__ = str('')
-    __redis_server_info__ = {}
 
 
 __all__ = ['client', 'configuration', 'debug', 'patch']
