@@ -18,6 +18,7 @@ Example:
       'value'
       >>>
 """
+from __future__ import print_function
 import json
 import os
 
@@ -35,16 +36,33 @@ if os.path.exists(_metadata_file):
         __git_origin__ = str(_package_metadata['git_origin'])
         __git_branch__ = str(_package_metadata['git_branch'])
         __git_hash__ = str(_package_metadata['git_hash'])
+        __git_base_url__ = 'https://github.com/yahoo/redislite'
+        if __git_origin__.endswith('.git'):
+            __git_base_url__ = __git_origin__[:-4].strip('/')
+        __source_url__ = __git_base_url__ + '/tree/' + __git_hash__
+
 else:   # pragma: no cover
     __version__ = str('0.0.0')
     __git_version__ = str("")
     __git_origin__ = str("")
     __git_branch__ = str("")
     __git_hash__ = str("")
+    __source_url__ = str('')
 
-__source_url__ = 'https://github.com/yahoo/redislite/tree/' + __git_hash__
 
 
 __all__ = ['client', 'configuration', 'patch']
 
 from .client import Redis, StrictRedis  # NOQA
+
+if __name__ == '__main__':
+    print("Redislite debug information:")
+    print('\tVersion: %s' % __version__)
+    print('')
+    print('\tSource Code Information')
+    if __git_version__:
+        print('\t\tGit Source URL: %s' % __source_url__)
+        print('\t\tGit Hash: %s' % __git_hash__)
+        print('\t\tGit Version: %s' % __git_version__)
+        print('\t\tGit Origin: %s' % __git_origin__)
+        print('\t\tGit Branch: %s' % __git_branch__)
