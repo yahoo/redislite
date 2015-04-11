@@ -50,6 +50,6 @@ else:   # pragma: no cover
 
 
 
-__all__ = ['client', 'configuration', 'patch']
+__all__ = ['client', 'configuration', 'debug', 'patch']
 
 from .client import Redis, StrictRedis  # NOQA
