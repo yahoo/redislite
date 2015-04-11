@@ -105,14 +105,17 @@ class InstallRedis(install):
         self.copy_tree(self.build_scripts, self.install_scripts)
 
         install_scripts = self.install_scripts
+        print('install_scripts: %s' % install_scripts)
         md_file = os.path.join(self.build_lib, 'redislite/package_metadata.json')
+        print('md_file: %s' % md_file)
         open('/tmp/install.info', 'w').write(md_file)
         if os.path.exists(md_file):
             with open(md_file) as fh:
                 md = json.load(fh)
-                md['redis_bin'] = self.install_scripts
+                md['redis_bin'] = install_scripts
+            print('new metadata: %s' % md)
             with open(md_file, 'w') as fh:
-                json.dump(md, fh)
+                json.dump(md, fh, indent=4)
 
 # Create a dictionary of our arguments, this way this script can be imported
 #  without running setup() to allow external scripts to see the setup settings.
