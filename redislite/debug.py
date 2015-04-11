@@ -10,7 +10,7 @@ if __name__ == '__main__':  # pragma: no cover
     print('\tVersion: %s' % __version__)
     print('\tModule Path: %s' % os.path.dirname(__file__))
     print('\n\tInstalled Redis Server:')
-    for key, value in __redis_server_info__:
+    for key, value in __redis_server_info__.items():
         print('\t\t%s = %s' % (key, value))
     redis_server = find_executable('redis-server')
     print('\n\tFound redis-server: %s' % redis_server)
