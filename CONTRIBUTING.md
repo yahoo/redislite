@@ -30,11 +30,19 @@ Guidelines for bug reports:
 
 3. **Isolate the problem** &mdash; create a [reduced test case](http://css-tricks.com/reduced-test-cases/) and a live example.
 
-A good bug report shouldn't leave others needing to chase you up for more
-information. Please try to be as detailed as possible in your report. What is
-your environment? What steps will reproduce the issue? What browser(s) and OS
-experience the problem? What would you expect to be the outcome? All these
-details will help people to fix any potential bugs.
+4. **Write a good bug report***
+
+A good bug report shouldn't leave others needing to chase you up for more information. 
+
+Try and include the following information:
+
+* What is your environment?
+* What steps will reproduce the issue?
+* What were you expecting to happen?
+* If the redislite python module installed, include the output of the debug module, which can be obtained by running:
+
+
+    python -m redislite.debug
 
 # Contributing to RedisLite
 

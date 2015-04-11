@@ -1,11 +1,23 @@
 from __future__ import print_function
+from distutils.spawn import find_executable
 from .__init__ import __version__, __git_version__, __source_url__, \
-    __git_hash__, __git_origin__, __git_branch__
+    __git_hash__, __git_origin__, __git_branch__, __redis_server_info__
+import os
 
 
 if __name__ == '__main__':  # pragma: no cover
     print("Redislite debug information:")
     print('\tVersion: %s' % __version__)
+    print('\tModule Path: %s' % os.path.dirname(__file__))
+    print('\n\tInstalled Redis Server:')
+    for key, value in __redis_server_info__:
+        print('\t\t%s = %s' % (key, value))
+    redis_server = find_executable('redis-server')
+    print('\n\tFound redis-server: %s' % redis_server)
+    for item in os.popen('%s --version' % redis_server).read().strip().split():
+        if '=' in item:
+            key, value = item.split('=')
+            print('\t\t%s = %s' % (key, value))
     print('')
     print('\tSource Code Information')
     if __git_version__:

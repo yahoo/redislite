@@ -36,9 +36,10 @@ if os.path.exists(_metadata_file):
         __git_branch__ = str(_package_metadata['git_branch'])
         __git_hash__ = str(_package_metadata['git_hash'])
         __git_base_url__ = 'https://github.com/yahoo/redislite'
-        if __git_origin__.endswith('.git'):
+        if __git_origin__.endswith('.git'):  # pragma: no cover
             __git_base_url__ = __git_origin__[:-4].strip('/')
         __source_url__ = __git_base_url__ + '/tree/' + __git_hash__
+        __redis_server_info__ = _package_metadata['redis_server']
 
 else:   # pragma: no cover
     __version__ = str('0.0.0')
@@ -47,7 +48,7 @@ else:   # pragma: no cover
     __git_branch__ = str("")
     __git_hash__ = str("")
     __source_url__ = str('')
-
+    __redis_server_info__ = {}
 
 
 __all__ = ['client', 'configuration', 'debug', 'patch']

@@ -12,12 +12,14 @@ from distutils.command.build import build
 from distutils.core import Extension
 import distutils.util
 from subprocess import call
+import subprocess
 
 
 logger = logging.getLogger(__name__)
 METADATA_FILENAME = 'redislite/package_metadata.json'
 BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
+REDIS_SERVER_METADATA = {}
 
 
 def readme():
@@ -56,6 +58,13 @@ class build_redis(build):
             print('*' * 80)
 
         self.execute(_compile, [], 'compiling redis')
+
+        # Store the redis-server --version output for later
+        for line in os.popen('bin/redis-server --version').readlines():
+            for item in line.strip().split():
+                if '=' in item:
+                    key, value = item.split('=')
+                    REDIS_SERVER_METADATA[key] = value
 
         # copy resulting tool to script folder
         self.mkpath(self.build_scripts)
@@ -218,7 +227,8 @@ def get_and_update_metadata():
             'git_origin': git.origin,
             'git_branch': git.branch,
             'git_hash': git.hash,
-            'version': git.version
+            'version': git.version,
+            'redis_server': REDIS_SERVER_METADATA
         }
         with open(METADATA_FILENAME, 'w') as fh:
             json.dump(metadata, fh)
