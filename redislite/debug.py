@@ -15,6 +15,8 @@ if __name__ == '__main__':  # pragma: no cover
     for key, value in __redis_server_info__.items():
         print('\t\t%s = %s' % (key, value))
     redis_server = find_executable('redis-server')
+    if __redis_executable__:
+        redis_server = __redis_executable__
     print('\n\tFound redis-server: %s' % redis_server)
     for item in os.popen('%s --version' % redis_server).read().strip().split():
         if '=' in item:
