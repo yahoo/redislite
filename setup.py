@@ -70,14 +70,6 @@ class build_redis(build):
                 logger.debug('copy: %s -> %s', target, self.build_scripts)
                 self.copy_file(target, self.build_scripts)
 
-        # Store the redis-server --version output for later
-        for line in os.popen('%s --version' % os.path.join(REDIS_PATH, 'bin/redis-server')).readlines():
-            for item in line.strip().split():
-                if '=' in item:
-                    key, value = item.split('=')
-                    REDIS_SERVER_METADATA[key] = value
-
-
 
 class InstallRedis(install):
     def initialize_options(self):
@@ -113,6 +105,13 @@ class InstallRedis(install):
             with open(md_file) as fh:
                 md = json.load(fh)
                 md['redis_bin'] = os.path.join(install_scripts, 'redis-server')
+            # Store the redis-server --version output for later
+            for line in os.popen('%s --version' % md['redis_bin']).readlines():
+                for item in line.strip().split():
+                    if '=' in item:
+                        key, value = item.split('=')
+                        REDIS_SERVER_METADATA[key] = value
+            md['redis_server'] = REDIS_SERVER_METADATA
             print('new metadata: %s' % md)
             with open(md_file, 'w') as fh:
                 json.dump(md, fh, indent=4)
