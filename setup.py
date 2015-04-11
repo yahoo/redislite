@@ -89,6 +89,7 @@ class InstallRedis(install):
         self.set_undefined_options('build', ('build_scripts', 'build_scripts'))
 
     def run(self):
+        global install_scripts
         # run original install code
         install.run(self)
 
@@ -248,7 +249,7 @@ def get_and_update_metadata():
             'redis-bin': install_scripts
         }
         with open(METADATA_FILENAME, 'w') as fh:
-            json.dump(metadata, fh)
+            json.dump(metadata, fh, indent=4)
     return metadata
 
 
