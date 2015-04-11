@@ -105,6 +105,7 @@ class InstallRedis(install):
 
         install_scripts = self.install_scripts
         md_file = os.path.join(self.build_lib, 'redislite/package_metadata.json')
+        open('/tmp/install.info', 'w').write(md_file)
         if os.path.exists(md_file):
             with open(md_file) as fh:
                 md = json.load(fh)
