@@ -60,7 +60,7 @@ class build_redis(build):
         self.execute(_compile, [], 'compiling redis')
 
         # Store the redis-server --version output for later
-        for line in os.popen('bin/redis-server --version').readlines():
+        for line in os.popen('%s --version' % os.path.join(REDIS_PATH, 'bin/redis-server')).readlines():
             for item in line.strip().split():
                 if '=' in item:
                     key, value = item.split('=')
