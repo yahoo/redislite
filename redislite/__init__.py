@@ -18,7 +18,6 @@ Example:
       'value'
       >>>
 """
-from __future__ import print_function
 import json
 import os
 
@@ -54,15 +53,3 @@ else:   # pragma: no cover
 __all__ = ['client', 'configuration', 'patch']
 
 from .client import Redis, StrictRedis  # NOQA
-
-if __name__ == '__main__':
-    print("Redislite debug information:")
-    print('\tVersion: %s' % __version__)
-    print('')
-    print('\tSource Code Information')
-    if __git_version__:
-        print('\t\tGit Source URL: %s' % __source_url__)
-        print('\t\tGit Hash: %s' % __git_hash__)
-        print('\t\tGit Version: %s' % __git_version__)
-        print('\t\tGit Origin: %s' % __git_origin__)
-        print('\t\tGit Branch: %s' % __git_branch__)
