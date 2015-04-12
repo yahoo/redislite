@@ -198,6 +198,8 @@ class TestRedislite(unittest.TestCase):
         self.assertIsInstance(redislite.__git_origin__, str)
         self.assertIsInstance(redislite.__git_branch__, str)
         self.assertIsInstance(redislite.__git_hash__, str)
+        self.assertIsInstance(redislite.__redis_server_info__, dict)
+        self.assertIsInstance(redislite.__redis_executable__, str)
 
 
 if __name__ == '__main__':
