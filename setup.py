@@ -90,6 +90,9 @@ class InstallRedis(install):
             'running InstallRedis %s -> %s', self.build_lib, self.install_lib
         )
         self.copy_tree(self.build_lib, self.install_lib)
+        module_bin = os.path.join(self.install_lib, 'bin')
+        #os.makedirs(module_bin, 0o0755)
+        self.copy_tree(self.build_scripts, module_bin)
         logger.debug(
             'running InstallRedis %s -> %s',
             self.build_scripts, self.install_scripts
@@ -98,9 +101,9 @@ class InstallRedis(install):
 
         install_scripts = self.install_scripts
         print('install_scripts: %s' % install_scripts)
-        md_file = os.path.join(self.install_lib, 'redislite/package_metadata.json')
-        print('md_file: %s' % md_file)
-        open('/tmp/install.info', 'w').write(md_file)
+        md_file = os.path.join(
+            self.install_lib, 'redislite/package_metadata.json'
+        )
         if os.path.exists(md_file):
             with open(md_file) as fh:
                 md = json.load(fh)
@@ -154,7 +157,7 @@ args = {
             'Topic :: Utilities',
     ],
     'package_data': {
-        'redislite': ['package_metadata.json']
+        'redislite': ['package_metadata.json', 'bin/redis-server'],
     },
     'include_package_data': True,
     'cmdclass': {
