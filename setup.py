@@ -90,7 +90,7 @@ class InstallRedis(install):
             'running InstallRedis %s -> %s', self.build_lib, self.install_lib
         )
         self.copy_tree(self.build_lib, self.install_lib)
-        module_bin = os.path.join(self.install_lib, 'bin')
+        module_bin = os.path.join(self.install_lib, 'redislite/bin')
         if not os.path.exists(module_bin):
             os.makedirs(module_bin, 0o0755)
         self.copy_tree(self.build_scripts, module_bin)
