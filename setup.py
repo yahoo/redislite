@@ -20,7 +20,7 @@ METADATA_FILENAME = 'redislite/package_metadata.json'
 BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
 REDIS_SERVER_METADATA = {}
-install_scripts = []
+install_scripts = ''
 
 
 def readme():
