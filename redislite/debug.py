@@ -8,15 +8,14 @@ import os
 
 def print_debug_info():
     redis_server = find_executable('redis-server')
-    if __redis_executable__:
+    if __redis_executable__:  # pragma: no cover
         redis_server = __redis_executable__
     print("Redislite debug information:")
     print('\tVersion: %s' % __version__)
     print('\tModule Path: %s' % os.path.dirname(__file__))
     print('\n\tInstalled Redis Server:')
     print('\t\tRedis Executable: %s' % redis_server)
-    print('\t\tRedis Server Info: %s' % __redis_server_info__)
-    for key, value in __redis_server_info__.items():
+    for key, value in __redis_server_info__.items():  # pragma: no cover
         print('\t\t%s = %s' % (key, value))
     print('\n\tFound redis-server: %s' % redis_server)
     for item in os.popen('%s --version' % redis_server).read().strip().split():
@@ -25,7 +24,7 @@ def print_debug_info():
             print('\t\t%s = %s' % (key, value))
     print('')
     print('\tSource Code Information')
-    if __git_version__:
+    if __git_version__:  # pragma: no cover
         print('\t\tGit Source URL: %s' % __source_url__)
         print('\t\tGit Hash: %s' % __git_hash__)
         print('\t\tGit Version: %s' % __git_version__)
