@@ -22,6 +22,10 @@ class TestRedislite(unittest.TestCase):
     def setUp(self):
         pass
 
+    def test_debug(self):
+        import redislite.debug
+        redislite.debug.print_debug_info()
+
     def test_configuration_config(self):
         import redislite.configuration
         result = redislite.configuration.config()
