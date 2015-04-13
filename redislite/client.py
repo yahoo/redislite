@@ -21,6 +21,7 @@ import subprocess
 import tempfile
 import time
 from . import configuration
+from . import __redis_executable__
 
 
 logger = logging.getLogger(__name__)
@@ -119,7 +120,10 @@ class RedisMixin(object):
         )
         fh.close()
 
-        command = ['redis-server', config_file]
+        redis_executable = __redis_executable__
+        if not redis_executable:  # pragma: no cover
+            redis_executable = 'redis-server'
+        command = [redis_executable, config_file]
         logger.debug('Running: %s', ' '.join(command))
         rc = subprocess.call(command)
         if rc:  # pragma: no cover

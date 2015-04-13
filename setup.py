@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 METADATA_FILENAME = 'redislite/package_metadata.json'
 BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
+REDIS_SERVER_METADATA = {}
+install_scripts = ''
 
 
 def readme():
@@ -26,6 +28,8 @@ def readme():
 
 
 class build_redis(build):
+    global REDIS_SERVER_METADATA
+
     def run(self):
         # run original build code
         build.run(self)
@@ -76,6 +80,7 @@ class InstallRedis(install):
         self.set_undefined_options('build', ('build_scripts', 'build_scripts'))
 
     def run(self):
+        global install_scripts
         # run original install code
         install.run(self)
 
@@ -84,12 +89,40 @@ class InstallRedis(install):
             'running InstallRedis %s -> %s', self.build_lib, self.install_lib
         )
         self.copy_tree(self.build_lib, self.install_lib)
+        module_bin = os.path.join(self.install_lib, 'redislite/bin')
+        if not os.path.exists(module_bin):
+            os.makedirs(module_bin, 0o0755)
+        self.copy_tree(self.build_scripts, module_bin)
         logger.debug(
             'running InstallRedis %s -> %s',
             self.build_scripts, self.install_scripts
         )
         self.copy_tree(self.build_scripts, self.install_scripts)
 
+        install_scripts = self.install_scripts
+        print('install_scripts: %s' % install_scripts)
+        md_file = os.path.join(
+            self.install_lib, 'redislite/package_metadata.json'
+        )
+        if os.path.exists(md_file):
+            with open(md_file) as fh:
+                md = json.load(fh)
+                if os.path.exists(os.path.join(module_bin, 'redis-server')):
+                    md['redis_bin'] = os.path.join(module_bin, 'redis-server')
+                else:
+                    md['redis_bin'] = os.path.join(
+                        install_scripts, 'redis-server'
+                    )
+            # Store the redis-server --version output for later
+            for line in os.popen('%s --version' % md['redis_bin']).readlines():
+                for item in line.strip().split():
+                    if '=' in item:
+                        key, value = item.split('=')
+                        REDIS_SERVER_METADATA[key] = value
+            md['redis_server'] = REDIS_SERVER_METADATA
+            print('new metadata: %s' % md)
+            with open(md_file, 'w') as fh:
+                json.dump(md, fh, indent=4)
 
 # Create a dictionary of our arguments, this way this script can be imported
 #  without running setup() to allow external scripts to see the setup settings.
@@ -129,7 +162,7 @@ args = {
             'Topic :: Utilities',
     ],
     'package_data': {
-        'redislite': ['package_metadata.json']
+        'redislite': ['package_metadata.json', 'bin/redis-server'],
     },
     'include_package_data': True,
     'cmdclass': {
@@ -208,6 +241,9 @@ def get_and_update_metadata():
     Get the package metadata or generate it if missing
     :return:
     """
+    global METADATA_FILENAME
+    global REDIS_SERVER_METADATA
+
     if not os.path.exists('.git') and os.path.exists(METADATA_FILENAME):
         with open(METADATA_FILENAME) as fh:
             metadata = json.load(fh)
@@ -218,14 +254,18 @@ def get_and_update_metadata():
             'git_origin': git.origin,
             'git_branch': git.branch,
             'git_hash': git.hash,
-            'version': git.version
+            'version': git.version,
+            'redis_server': REDIS_SERVER_METADATA,
+            'redis_bin': install_scripts
         }
         with open(METADATA_FILENAME, 'w') as fh:
-            json.dump(metadata, fh)
+            json.dump(metadata, fh, indent=4)
     return metadata
 
 
 if __name__ == '__main__':
+    os.environ['CC'] = 'gcc'
+
     logging.basicConfig(level=logging.INFO)
 
     logger.debug('Building for platform: %s', distutils.util.get_platform())
