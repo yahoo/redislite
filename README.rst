@@ -173,3 +173,5 @@ More Information
 ================
 
 There is more detailed information on the redislite documentation page at http://redislite.readthedocs.org/en/latest/
+
+Redislite is Free software under the New BSD license, see LICENSE.txt for details

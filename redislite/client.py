@@ -99,7 +99,8 @@ class RedisMixin(object):
                 'Creating temporary redis directory %s', self.redis_dir
             )
             self.pidfile = os.path.join(self.redis_dir, 'redis.pid')
-            self.socket_file = os.path.join(self.redis_dir, 'redis.socket')
+            if not self.socket_file:
+                self.socket_file = os.path.join(self.redis_dir, 'redis.socket')
 
     def _start_redis(self):
         """
@@ -219,6 +220,22 @@ class RedisMixin(object):
 
             # Remove our keyword argument
             del kwargs['dbfilename']
+
+        remove = []
+        for kwarg in kwargs:
+            if kwarg.startswith('redislite_'):
+                remove.append(kwarg)
+                arg = kwarg[len('redislite_'):]
+                if arg in ['dbfilename']:
+                    self.db_filename = arg
+                if arg in ['socketfile']:
+                    dirname = os.path.dirname(arg)
+                    if dirname:
+                        arg = os.path.join(os.getcwd(), arg)
+                    self.socket_file = arg
+
+        for kwarg in remove:
+            del kwargs[kwarg]
 
         if db_filename and db_filename == os.path.basename(db_filename):
             db_filename = os.path.join(os.getcwd(), db_filename)

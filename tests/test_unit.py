@@ -13,6 +13,7 @@ import os
 import redislite
 import redislite.patch
 import shutil
+import stat
 import tempfile
 import unittest
 
@@ -165,6 +166,18 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(r.redis_dir))
         self.assertTrue(os.path.exists(r.pidfile))
         self.assertTrue(os.path.exists(r.socket_file))
+        r._cleanup()
+
+    def test_redislite_redis_custom_socket_file(self):
+        """
+        Test creating a redis instance with a specified socket filename
+        :return:
+        """
+        socket_file_name = 'test.socket'
+        r = redislite.Redis(redislite_socketfile=socket_file_name)
+        mode = os.stat(socket_file_name).st_mode
+        isSocket = stat.S_ISSOCK(mode)
+        self.assertTrue(isSocket)
         r._cleanup()
 
     def test_redislite_Redis_pid(self):
