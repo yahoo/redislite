@@ -58,7 +58,7 @@ if os.path.exists(
         os.path.basename(__file__),
         'bin/redis-server'
     )
-):
+):  # pragma: no cover
     __redis_executable__ = os.path.join(
         os.path.basename(__file__),
         'bin/redis-server'
