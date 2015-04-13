@@ -12,7 +12,6 @@ from distutils.command.build import build
 from distutils.core import Extension
 import distutils.util
 from subprocess import call
-import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -265,6 +264,8 @@ def get_and_update_metadata():
 
 
 if __name__ == '__main__':
+    os.environ['CC'] = 'gcc'
+
     logging.basicConfig(level=logging.INFO)
 
     logger.debug('Building for platform: %s', distutils.util.get_platform())
