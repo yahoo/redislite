@@ -108,7 +108,12 @@ class InstallRedis(install):
         if os.path.exists(md_file):
             with open(md_file) as fh:
                 md = json.load(fh)
-                md['redis_bin'] = os.path.join(install_scripts, 'redis-server')
+                if os.path.exists(os.path.join(module_bin, 'redis-server')):
+                    md['redis_bin'] = os.path.join(module_bin, 'redis-server')
+                else:
+                    md['redis_bin'] = os.path.join(
+                        install_scripts, 'redis-server'
+                    )
             # Store the redis-server --version output for later
             for line in os.popen('%s --version' % md['redis_bin']).readlines():
                 for item in line.strip().split():
