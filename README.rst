@@ -169,65 +169,6 @@ redis_collections module.
     ['foo']
 
 
-Or the Walrus module
-
-.. code-block:: python
-
-    >>> from redislite.patch import patch_redis
-    >>> patch_redis('/tmp/walrus.db')
-    >>> from walrus import *
-    >>> db = Database()
-    >>> huey = db.Hash('huey')
-    >>> huey.update(color='white', temperament='ornery', type='kitty')
-    <Hash "huey": {'color': 'white', 'type': 'kitty', 'temperament': 'ornery'}>
-    >>> huey.keys()
-    ['color', 'type', 'temperament']
-    >>> 'color' in huey
-    True
-    >>> huey['color']
-    'white'
-
-
-Celery usage
-============
-
-.. code-block:: python
-
-    # settings.py
-
-    from redislite import Redis
-
-    # Create a Redis instance using redislite
-    REDIS_DB_PATH = os.path.join('/tmp/my_redis.db')
-    rdb = Redis(RDB_PATH)
-    REDIS_SOCKET_PATH = 'redis+socket://%s' % (rdb.socket_file, )
-
-    # Use redislite for the Celery broker
-    BROKER_URL = REDIS_SOCKET_PATH
-
-    # (Optionally) use redislite for the Celery result backend
-    CELERY_RESULT_BACKEND = REDIS_SOCKET_PATH
-
-.. code-block:: python
-    
-    # your_celery_app.py
-
-    from celery import Celery
-
-    # for django projects
-    from django.conf import settings
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
-    celery_app = Celery('my_app')
-    celery_app.config_from_object('django.conf:settings')
-
-    # for other projects
-    celery_app = Celery('my_app')
-    celery_app.config_from_object('settings')
-
-Note that only one Redis instance is created, and others merely discover the running instance and use its existing socket file path.
-
-
-
 More Information
 ================
 
