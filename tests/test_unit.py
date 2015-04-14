@@ -246,9 +246,6 @@ class TestRedislite(unittest.TestCase):
         self.assertIsInstance(redislite.__redis_server_info__, dict)
         self.assertIsInstance(redislite.__redis_executable__, str)
 
-    def test_debug_print_debug_info(self):
-        import redislite.debug
-        redislite.debug.print_debug_info()
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
