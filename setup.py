@@ -135,8 +135,8 @@ args = {
     'license': 'BSD',
     'packages': ['redislite'],
     'description': 'Redis built into a python package',
-    'install_requires': ['redis', 'psutil'],
-    'requires': ['redis', 'psutil'],
+    'install_requires': ['redis', 'psutil', 'jinja2'],
+    'requires': ['redis', 'psutil', 'jinja2'],
     'long_description': readme(),
     'classifiers': [
             'Development Status :: 4 - Beta',

@@ -67,7 +67,7 @@ port 0
 # make sure to raise both the value of somaxconn and tcp_max_syn_backlog
 # in order to get the desired effect.
 #tcp-backlog 511
-#tcp-backlog {{ tcp-backlog }}
+#tcp-backlog {{ tcp_backlog }}
 
 # By default Redis listens for connections from all the network interfaces
 # available on the server. It is possible to listen to just one or multiple
