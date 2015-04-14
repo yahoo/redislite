@@ -56,8 +56,8 @@ pidfile {{ pidfile }}
 # Accept connections on the specified port, default is 6379.
 # If port 0 is specified Redis will not listen on a TCP socket.
 #port 6379
-#port {{ port }}
-port 0
+port {{ port }}
+
 
 # TCP listen() backlog.
 #
@@ -67,7 +67,7 @@ port 0
 # make sure to raise both the value of somaxconn and tcp_max_syn_backlog
 # in order to get the desired effect.
 #tcp-backlog 511
-#tcp-backlog {{ tcp_backlog }}
+tcp-backlog {{ tcp_backlog }}
 
 # By default Redis listens for connections from all the network interfaces
 # available on the server. It is possible to listen to just one or multiple
