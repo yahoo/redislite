@@ -835,7 +835,7 @@ def config(*args, **kwargs):
     """
     global default_settings
 
-    settings = default_settings
+    settings = dict(default_settings)
     settings.update(kwargs)
 
     return template.render(settings)

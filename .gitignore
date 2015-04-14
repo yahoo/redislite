@@ -83,3 +83,12 @@ __pycache__/
 *.py[cod]
 .idea/
 redislite/package_metadata.json
+
+# testing artifacts
+cobertura.xml
+test_unit_redis.db
+
+# redis build artifacts
+redis.submodule/**/*.o
+redis.submodule/**/.make-*
+redis.submodule/bin/
