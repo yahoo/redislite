@@ -806,13 +806,13 @@ aof-rewrite-incremental-fsync yes
 default_settings = {
     'daemonize': 'yes',
     'pidfile': '/var/run/redislite/redis.pid',
-    'tcp-backlog': '511',
+    'tcp_backlog': '511',
     'port': '0',
     'unixsocket': '/var/run/redislite/redis.socket',
     'unixsocketperm': '700',
     'timeout': '0',
     'dbfilename': 'redis.db',
-    'dbdir': './'
+    'dbdir': './',
 }
 
 
