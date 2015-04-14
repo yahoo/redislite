@@ -6,8 +6,9 @@ This module contains functions to generate a redis configuration from a
 configuration template.
 """
 
+from jinja2 import Template
 
-template = """
+template = Template("""
 # Redis configuration file example
 
 # Note on units: when memory size is needed, it is possible to specify
@@ -43,19 +44,19 @@ template = """
 ################################ GENERAL  #####################################
 
 # By default Redis does not run as a daemon. Use 'yes' if you need it.
-# Note that Redis will write a pid file in /var/run/redis.pid when daemonized.
+# Note that Redis will write a pid file in /var/run/redis.pid when {daed.
 # daemonize no
-daemonize {daemonize}
+daemonize {{ daemonize }}
 
 # When running daemonized, Redis writes a pid file in /var/run/redis.pid by
 # default. You can specify a custom pid file location here.
 # pidfile /var/run/redis.pid
-pidfile {pidfile}
+pidfile {{ pidfile }}
 
 # Accept connections on the specified port, default is 6379.
 # If port 0 is specified Redis will not listen on a TCP socket.
 #port 6379
-#port {port}
+#port {{ port }}
 port 0
 
 # TCP listen() backlog.
@@ -66,7 +67,7 @@ port 0
 # make sure to raise both the value of somaxconn and tcp_max_syn_backlog
 # in order to get the desired effect.
 #tcp-backlog 511
-#tcp-backlog {tcp-backlog}
+#tcp-backlog {{ tcp-backlog }}
 
 # By default Redis listens for connections from all the network interfaces
 # available on the server. It is possible to listen to just one or multiple
@@ -84,11 +85,11 @@ port 0
 #
 # unixsocket /tmp/redis.sock
 # unixsocketperm 700
-unixsocket {unixsocket}
-unixsocketperm {unixsocketperm}
+unixsocket {{ unixsocket }}
+unixsocketperm {{ unixsocketperm }}
 
 # Close the connection after a client is idle for N seconds (0 to disable)
-timeout {timeout}
+timeout {{ timeout }}
 
 # TCP keepalive.
 #
@@ -191,7 +192,7 @@ rdbcompression yes
 rdbchecksum yes
 
 # The filename where to dump the DB
-dbfilename {dbfilename}
+dbfilename {{ dbfilename }}
 
 # The working directory.
 #
@@ -201,7 +202,7 @@ dbfilename {dbfilename}
 # The Append Only File will also be created inside this directory.
 #
 # Note that you must specify a directory here, not a file name.
-dir {dbdir}
+dir {{ dbdir }}
 
 ################################# REPLICATION #################################
 
@@ -313,7 +314,7 @@ repl-disable-tcp-nodelay no
 # repl-backlog-ttl 3600
 
 # The slave priority is an integer number published by Redis in the INFO output.
-# It is used by Redis Sentinel in order to select a slave to promote into a
+# If is used by Redis Sentinel in order to select a slave to promote into a
 # master if the master is no longer working correctly.
 #
 # A slave with a low priority number is considered better for promotion, so
@@ -799,7 +800,7 @@ hz 10
 # in order to commit the file to the disk more incrementally and avoid
 # big latency spikes.
 aof-rewrite-incremental-fsync yes
-"""
+""")
 
 
 default_settings = {
@@ -811,7 +812,7 @@ default_settings = {
     'unixsocketperm': '700',
     'timeout': '0',
     'dbfilename': 'redis.db',
-    'dbdir': './',
+    'dbdir': './'
 }
 
 
@@ -827,7 +828,6 @@ def settings(*args, **kwargs):
 
     return settings
 
-
 def config(*args, **kwargs):
     """
     Generate a redis configuration file based on the passed arguments
@@ -838,4 +838,4 @@ def config(*args, **kwargs):
     settings = default_settings
     settings.update(kwargs)
 
-    return template.format(**settings)
+    return template.render(settings)
