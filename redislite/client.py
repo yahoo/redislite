@@ -117,15 +117,19 @@ class RedisMixin(object):
         """
         config_file = os.path.join(self.redis_dir, 'redis.config')
 
+        kwargs = dict(self.server_config)
+        kwargs.update(
+            {
+                'pidfile': self.pidfile,
+                'unixsocket': self.socket_file,
+                'dbdir': self.dbdir,
+                'dbfilename': self.dbfilename
+            }
+        )
         # Write a redis.config to our temp directory
         fh = open(config_file, 'w')
         fh.write(
-            configuration.config(
-                pidfile=self.pidfile,
-                unixsocket=self.socket_file,
-                dbdir=self.dbdir,
-                dbfilename=self.dbfilename
-            )
+            configuration.config(**kwargs)
         )
         fh.close()
 
@@ -248,6 +252,8 @@ class RedisMixin(object):
 
             # Remove our keyword argument
             del kwargs['dbfilename']
+
+        self.server_config = kwargs.pop('serverconfig', None)
 
         remove = []
         for key, value in kwargs.items():
