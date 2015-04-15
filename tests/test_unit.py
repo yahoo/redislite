@@ -103,19 +103,6 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(filename))
         shutil.rmtree(temp_dir)
 
-    def test_redislite_Redis_with_serverconfig_dbfile_keyword(self):
-        temp_dir = tempfile.mkdtemp()
-        filename = os.path.join(temp_dir, 'redis.db')
-        self.assertFalse(os.path.exists(filename))
-        r = redislite.Redis(serverconfig_dbfilename=filename)
-        r.set('key', 'value')
-        result = r.get('key').decode(encoding='UTF-8')
-        self.assertEqual(result, 'value')
-        r.save()
-        r._cleanup()
-        self.assertTrue(os.path.exists(filename))
-        shutil.rmtree(temp_dir)
-
     def test_redislite_Redis_multiple_connections(self):
         # Generate a new redis server
         r = redislite.Redis()
@@ -200,7 +187,7 @@ class TestRedislite(unittest.TestCase):
         """
         socket_file_name = 'test.socket'
         full_socket_file_name = os.path.join(os.getcwd(), socket_file_name)
-        r = redislite.Redis(serverconfig_socketfile=socket_file_name)
+        r = redislite.Redis(unix_socket_path=socket_file_name)
         self.assertEqual(r.socket_file, full_socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
@@ -214,7 +201,7 @@ class TestRedislite(unittest.TestCase):
         :return:
         """
         socket_file_name = '/tmp/test.socket'
-        r = redislite.Redis(serverconfig_socketfile=socket_file_name)
+        r = redislite.Redis(unix_socket_path=socket_file_name)
         self.assertEqual(r.socket_file, socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
