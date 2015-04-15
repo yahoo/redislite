@@ -10,6 +10,7 @@ Tests for `redislite` module.
 from __future__ import print_function
 import logging
 import os
+import time
 import redis
 import redislite
 import redislite.patch
@@ -29,6 +30,8 @@ class TestRedisliteSlave(unittest.TestCase):
 
         self.r = redis.Redis(port=7000)
         self.r.set('key', 'value')
+
+        time.sleep(1) # TODO: Replace with check to see if slave is finished replicating
 
 
     def tearDown(self):
