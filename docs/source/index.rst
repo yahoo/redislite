@@ -25,6 +25,7 @@ Table of Contents
    topic/contributing
    topic/new_contributors
 
+
 Indices and tables
 ******************
 

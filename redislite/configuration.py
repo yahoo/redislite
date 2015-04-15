@@ -880,8 +880,6 @@ def config(*args, **kwargs):
     settings.update(kwargs)
 
 
-    logger.debug(settings)
-
     conf_template = template.render(settings)
     logger.debug((conf_template))
 

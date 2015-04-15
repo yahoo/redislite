@@ -246,6 +246,10 @@ class RedisMixin(object):
             # noinspection PyArgumentList,PyPep8
             return super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
+        self.socket_file = kwargs.get('unix_socket_path', None)
+        if self.socket_file and self.socket_file == os.path.basename(self.socket_file):
+            self.socket_file = os.path.join(os.getcwd(), self.socket_file)
+
         db_filename = None
         if args:
             db_filename = args[0]

@@ -131,6 +131,7 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(filename))
         shutil.rmtree(temp_dir)
 
+<<<<<<< HEAD
     def test_redislite_Redis_with_serverconfig_dbfile_keyword(self):
         temp_dir = tempfile.mkdtemp()
         filename = os.path.join(temp_dir, 'redis.db')
@@ -144,6 +145,8 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(filename))
         shutil.rmtree(temp_dir)
 
+=======
+>>>>>>> master
     def test_redislite_Redis_multiple_connections(self):
         # Generate a new redis server
         r = redislite.Redis()
