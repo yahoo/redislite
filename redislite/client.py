@@ -127,12 +127,10 @@ class RedisMixin(object):
         )
         # Write a redis.config to our temp directory
         fh = open(config_file, 'w')
-
         fh.write(
             configuration.config(**kwargs)
         )
         fh.close()
-
 
         redis_executable = __redis_executable__
         if not redis_executable:  # pragma: no cover
@@ -227,7 +225,6 @@ class RedisMixin(object):
             logger.warn('No pidfile found')
             return
         self.pidfile = settings['pidfile']
-
         self.socket_file = settings['unixsocket']
         self.dbdir = settings['dbdir']
         self.dbfilename = settings['dbfilename']

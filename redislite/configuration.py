@@ -869,6 +869,7 @@ def settings(*args, **kwargs):
 
     return settings
 
+
 def config(*args, **kwargs):
     """
     Generate a redis configuration file based on the passed arguments
@@ -878,6 +879,5 @@ def config(*args, **kwargs):
 
     settings = dict(default_settings)
     settings.update(kwargs)
-
 
     return template.render(settings)
