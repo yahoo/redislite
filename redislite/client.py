@@ -117,16 +117,20 @@ class RedisMixin(object):
         """
         config_file = os.path.join(self.redis_dir, 'redis.config')
 
+        kwargs = dict(self.server_config)
+        kwargs.update(
+            {
+                'pidfile': self.pidfile,
+                'unixsocket': self.socket_file,
+                'dbdir': self.dbdir,
+                'dbfilename': self.dbfilename
+            }
+        )
         # Write a redis.config to our temp directory
         fh = open(config_file, 'w')
 
         fh.write(
-            configuration.config(
-                pidfile=self.pidfile,
-                unixsocket=self.socket_file,
-                dbdir=self.dbdir,
-                dbfilename=self.dbfilename
-            )
+            configuration.config(**kwargs)
         )
         fh.close()
 
@@ -240,7 +244,7 @@ class RedisMixin(object):
         # request to the redis.Redis module
         if 'host' in kwargs.keys() or 'port' in kwargs.keys():
             # noinspection PyArgumentList,PyPep8
-            super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
+            return super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
         db_filename = None
         if args:
@@ -255,24 +259,7 @@ class RedisMixin(object):
             # Remove our keyword argument
             del kwargs['dbfilename']
 
-        remove = []
-        for key, value in kwargs.items():
-            if key.startswith('serverconfig_'):
-                remove.append(key)
-                arg = key[len('serverconfig_'):]
-                if arg in ['dbfilename']:
-                    db_filename = value
-                if arg in ['socketfile']:
-                    dirname = os.path.dirname(value)
-                    if not dirname:
-                        value = os.path.join(os.getcwd(), value)
-                    logger.debug('Socketfile: %s', value)
-                    self.socket_file = value
-                else:
-                    self.redis_server_config[key] = value
-
-        for kwarg in remove:
-            del kwargs[kwarg]
+        self.server_config = kwargs.pop('serverconfig', {})
 
         if db_filename and db_filename == os.path.basename(db_filename):
             db_filename = os.path.join(os.getcwd(), db_filename)
