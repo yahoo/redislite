@@ -17,12 +17,14 @@ redislite.Redis() Class
 .. autoclass:: redislite.Redis
    :members:
    :inherited-members:
+   :show-inheritance:
 
 redislite.StrictRedis() Class
 =============================
 .. autoclass:: redislite.StrictRedis
    :members:
    :inherited-members:
+   :show-inheritance:
 
 Functions to patch the redis module
 ===================================
