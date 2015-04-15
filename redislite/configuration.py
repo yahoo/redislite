@@ -225,7 +225,11 @@ dir {{ dbdir }}
 #    network partition slaves automatically try to reconnect to masters
 #    and resynchronize with them.
 #
-# slaveof <masterip> <masterport>
+
+{% if slaveof %}
+    slaveof {{ slaveof }}
+{% endif %}
+
 
 # If the master is password protected (using the "requirepass" configuration
 # directive below) it is possible to tell the slave to authenticate before

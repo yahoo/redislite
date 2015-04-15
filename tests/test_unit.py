@@ -47,9 +47,18 @@ class TestRedislite(unittest.TestCase):
 
         self.assertIn('\ndaemonize yes', result)
         self.assertIn('\npidfile /var/run/redislite/test.pid', result)
-        self.assertIn('\ndbfilename redis.db', result)
-        self.assertEquals(1, 2)
+        self.assertIn('\ndbfilename test.db', result)
 
+    def test_configuration_config_slave(self):
+        import redislite.configuration
+        result = redislite.configuration.config(
+                pidfile='/var/run/redislite/test.pid',
+                unixsocket='/var/run/redislite/redis.socket',
+                dbdir=os.getcwd(),
+                dbfilename='test.db',
+                slaveof='localhost 6397'
+        )
+        self.assertIn(' slaveof localhost 6397', result)
 
 
     def test_configuration_modify_defaults(self):
