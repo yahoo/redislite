@@ -34,7 +34,7 @@ Triage issues
 ~~~~~~~~~~~~~
 If there is an uncommented issue that reports a bug, try and reproduce it. If you can reproduce it and it seems valid, add a comment that you confirmed the bug. Consider writing a code to test for the bug’s behavior, even if you don’t fix the bug itself.
 
-Reviewing Pull Requests
+Reviewing Pull Requests (code reviews)
 ~~~~~~~~~~~~~~~~~~~~~~~
 Look at pull requests to build familiarity with the codebase and the process.  Provide comments and feedback if you see issues or can provide more information.
 
