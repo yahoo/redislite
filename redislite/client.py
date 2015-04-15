@@ -58,7 +58,6 @@ class RedisMixin(object):
     dbdir = None
     settingregistryfile = None
     cleanupregistry = False
-    redis_server_config = {}
 
     def _cleanup(self):
         """
@@ -228,6 +227,7 @@ class RedisMixin(object):
             logger.warn('No pidfile found')
             return
         self.pidfile = settings['pidfile']
+
         self.socket_file = settings['unixsocket']
         self.dbdir = settings['dbdir']
         self.dbfilename = settings['dbfilename']

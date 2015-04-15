@@ -135,7 +135,7 @@ class TestRedislite(unittest.TestCase):
         temp_dir = tempfile.mkdtemp()
         filename = os.path.join(temp_dir, 'redis.db')
         self.assertFalse(os.path.exists(filename))
-        r = redislite.Redis(serverconfig_dbfilename=filename)
+        r = redislite.Redis(serverconfig={'dbfilename' : filename})
         r.set('key', 'value')
         result = r.get('key').decode(encoding='UTF-8')
         self.assertEqual(result, 'value')
@@ -228,7 +228,7 @@ class TestRedislite(unittest.TestCase):
         """
         socket_file_name = 'test.socket'
         full_socket_file_name = os.path.join(os.getcwd(), socket_file_name)
-        r = redislite.Redis(serverconfig_socketfile=socket_file_name)
+        r = redislite.Redis(serverconfig={'socketfile' : socket_file_name})
         self.assertEqual(r.socket_file, full_socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
@@ -242,7 +242,7 @@ class TestRedislite(unittest.TestCase):
         :return:
         """
         socket_file_name = '/tmp/test.socket'
-        r = redislite.Redis(serverconfig_socketfile=socket_file_name)
+        r = redislite.Redis(serverconfig={'socketfile' : socket_file_name})
         self.assertEqual(r.socket_file, socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
