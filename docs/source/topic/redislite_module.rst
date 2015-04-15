@@ -12,17 +12,24 @@ Module
 .. moduleauthor:: Dwight Hubbard <dhubbard@yahoo-inc.com>
 .. sectionauthor:: Dwight Hubbard <dhubbard@yahoo-inc.com>
 
-Classes
-=======
-
+redislite.Redis() Class
+=======================
 .. autoclass:: redislite.Redis
    :members:
+   :inherited-members:
 
+redislite.StrictRedis() Class
+=============================
 .. autoclass:: redislite.StrictRedis
    :members:
-
+   :inherited-members:
 
 Functions to patch the redis module
 ===================================
 .. automodule:: redislite.patch
+    :members:
+
+Functions for troubleshooting
+=============================
+.. automodule:: redislite.debug
     :members:
