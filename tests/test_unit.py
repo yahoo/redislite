@@ -31,34 +31,6 @@ class TestRedislite(unittest.TestCase):
         import redislite.configuration
         result = redislite.configuration.config()
         self.assertIn('\ndaemonize yes', result)
-        self.assertIn('\npidfile /var/run/redislite/redis.pid', result)
-        self.assertIn('\ntcp-backlog 511', result)
-
-
-
-    def test_configuration_config_db(self):
-        import redislite.configuration
-        result = redislite.configuration.config(
-                pidfile='/var/run/redislite/test.pid',
-                unixsocket='/var/run/redislite/redis.socket',
-                dbdir=os.getcwd(),
-                dbfilename='test.db',
-        )
-
-        self.assertIn('\ndaemonize yes', result)
-        self.assertIn('\npidfile /var/run/redislite/test.pid', result)
-        self.assertIn('\ndbfilename test.db', result)
-
-    def test_configuration_config_slave(self):
-        import redislite.configuration
-        result = redislite.configuration.config(
-                pidfile='/var/run/redislite/test.pid',
-                unixsocket='/var/run/redislite/redis.socket',
-                dbdir=os.getcwd(),
-                dbfilename='test.db',
-                slaveof='localhost 6397'
-        )
-        self.assertIn(' slaveof localhost 6397', result)
 
 
     def test_configuration_modify_defaults(self):
@@ -86,6 +58,32 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(
             expected_subset.issubset(result_set)
         )
+
+
+    def test_configuration_config_db(self):
+        import redislite.configuration
+        result = redislite.configuration.config(
+                pidfile='/var/run/redislite/test.pid',
+                unixsocket='/var/run/redislite/redis.socket',
+                dbdir=os.getcwd(),
+                dbfilename='test.db',
+        )
+
+        self.assertIn('\ndaemonize yes', result)
+        self.assertIn('\npidfile /var/run/redislite/test.pid', result)
+        self.assertIn('\ndbfilename test.db', result)
+
+    def test_configuration_config_slave(self):
+        import redislite.configuration
+        result = redislite.configuration.config(
+                pidfile='/var/run/redislite/test.pid',
+                unixsocket='/var/run/redislite/redis.socket',
+                dbdir=os.getcwd(),
+                dbfilename='test.db',
+                slaveof='localhost 6397'
+        )
+        self.assertIn(' slaveof localhost 6397', result)
+
 
     def test_redislite_Redis(self):
         r = redislite.Redis()
@@ -130,20 +128,6 @@ class TestRedislite(unittest.TestCase):
         r._cleanup()
         self.assertTrue(os.path.exists(filename))
         shutil.rmtree(temp_dir)
-
-    def test_redislite_Redis_with_serverconfig_dbfile_keyword(self):
-        temp_dir = tempfile.mkdtemp()
-        filename = os.path.join(temp_dir, 'redis.db')
-        self.assertFalse(os.path.exists(filename))
-        r = redislite.Redis(serverconfig={'dbfilename' : filename})
-        r.set('key', 'value')
-        result = r.get('key').decode(encoding='UTF-8')
-        self.assertEqual(result, 'value')
-        r.save()
-        r._cleanup()
-        self.assertTrue(os.path.exists(filename))
-        shutil.rmtree(temp_dir)
-
 
     def test_redislite_Redis_multiple_connections(self):
         # Generate a new redis server
@@ -229,7 +213,7 @@ class TestRedislite(unittest.TestCase):
         """
         socket_file_name = 'test.socket'
         full_socket_file_name = os.path.join(os.getcwd(), socket_file_name)
-        r = redislite.Redis(serverconfig={'socketfile' : socket_file_name})
+        r = redislite.Redis(unix_socket_path=socket_file_name)
         self.assertEqual(r.socket_file, full_socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
@@ -243,7 +227,7 @@ class TestRedislite(unittest.TestCase):
         :return:
         """
         socket_file_name = '/tmp/test.socket'
-        r = redislite.Redis(serverconfig={'socketfile' : socket_file_name})
+        r = redislite.Redis(unix_socket_path=socket_file_name)
         self.assertEqual(r.socket_file, socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
