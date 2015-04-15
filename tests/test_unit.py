@@ -30,6 +30,8 @@ class TestRedislite(unittest.TestCase):
         import redislite.configuration
         result = redislite.configuration.config()
         self.assertIn('\ndaemonize yes', result)
+        self.assertIn('\npidfile /var/run/redislite/redis.pid', result)
+        self.assertIn('\ntcp-backlog 511', result)
 
 
     def test_configuration_modify_defaults(self):

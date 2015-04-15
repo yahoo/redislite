@@ -110,15 +110,22 @@ class RedisMixin(object):
 
         # Write a redis.config to our temp directory
         fh = open(config_file, 'w')
-        fh.write(
-            configuration.config(
+
+        conf = configuration.config(
                 pidfile=self.pidfile,
                 unixsocket=self.socket_file,
                 dbdir=self.dbdir,
                 dbfilename=self.dbfilename
             )
+
+        print conf
+
+        fh.write(
+            conf
         )
         fh.close()
+
+
 
         redis_executable = __redis_executable__
         if not redis_executable:  # pragma: no cover
