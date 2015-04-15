@@ -10,7 +10,7 @@ The redislite project always needs more people to help others. As soon as you le
 * Join the `#redislite IRC channel <http://webchat.freenode.net/?channels=%23redislite&uio=d4>`_ on Freenode and answer questions. By explaining redislite to other users, you’re going to learn a lot about the module yourself.
 * Report an issue_ or find a bug to fix on our issue_ tracker on github.
 * Improve the documentation.
-* Write unit tests.
+* Write unit tests.  
 
 
 Sign the Contributor License Agreement
