@@ -9,6 +9,9 @@ configuration template.
 from jinja2 import Template
 
 
+import logging
+logger = logging.getLogger(__name__)
+
 template = Template("""
 # Redis configuration file example
 
@@ -52,8 +55,7 @@ daemonize {{ daemonize }}
 # When running daemonized, Redis writes a pid file in /var/run/redis.pid by
 # default. You can specify a custom pid file location here.
 # pidfile /var/run/redis.pid
-# pidfile {{ pidfile }}
-pidfile /var/run/redislite/redis.pid
+pidfile {{ pidfile }}
 
 # Accept connections on the specified port, default is 6379.
 # If port 0 is specified Redis will not listen on a TCP socket.
@@ -87,7 +89,7 @@ tcp-backlog {{ tcp_backlog }}
 #
 # unixsocket /tmp/redis.sock
 # unixsocketperm 700
-# unixsocket {{ unixsocket }}
+ unixsocket {{ unixsocket }}
 # unixsocket /tmp/redislite/redis.sock
 unixsocketperm {{ unixsocketperm }}
 
@@ -804,7 +806,8 @@ hz {{ 10 }}
 # big latency spikes.
 aof-rewrite-incremental-fsync {{ aof_rewrite_incremental_fsync }}
 """)
-default_settings = {'daemonize': 'yes',
+default_settings = {
+    'daemonize': 'yes',
     'pidfile': '/var/run/redislite/redis.pid',
     'tcp_backlog': '511',
     'port': '0',
@@ -812,7 +815,7 @@ default_settings = {'daemonize': 'yes',
     'unixsocketperm': '700',
     'tcp_keepalive': '0',
     'loglevel': 'notice',
-    'logfile' : '""',
+    'logfile' : 'redis.log',
     'databases': '16',
     'stop_writes_on_bgsave_error': 'yes',
     'rdbcompression': 'yes',
@@ -872,4 +875,10 @@ def config(*args, **kwargs):
     settings = dict(default_settings)
     settings.update(kwargs)
 
-    return template.render(settings)
+
+    logger.debug(settings)
+
+    conf_template = template.render(settings)
+    logger.debug((conf_template))
+
+    return conf_template
