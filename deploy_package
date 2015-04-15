@@ -1,0 +1,5 @@
+#!/bin/bash
+export MACOSX_DEPLOYMENT_TARGET="10.6"
+export PYTHON_CONFIGURE_OPTS="--enable-universalsdk=/ --with-universal-archs=intel"
+
+python setup.py sdist bdist_wheel upload
