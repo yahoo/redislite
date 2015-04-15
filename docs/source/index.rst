@@ -23,7 +23,6 @@ Table of Contents
    topic/command_line
 
    topic/contributing
-   topic/new_contributors
 
 
 Indices and tables

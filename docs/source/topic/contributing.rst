@@ -112,10 +112,6 @@ To see this report, run::
 .. _fork: https://guides.github.com/activities/forking/
 
 
-#Working with Git and GitHub
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 
 Improvements to documentation
 --------------------------
