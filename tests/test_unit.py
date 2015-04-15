@@ -13,6 +13,7 @@ import os
 import redislite
 import redislite.patch
 import shutil
+import stat
 import tempfile
 import unittest
 
@@ -102,6 +103,19 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(filename))
         shutil.rmtree(temp_dir)
 
+    def test_redislite_Redis_with_serverconfig_dbfile_keyword(self):
+        temp_dir = tempfile.mkdtemp()
+        filename = os.path.join(temp_dir, 'redis.db')
+        self.assertFalse(os.path.exists(filename))
+        r = redislite.Redis(serverconfig_dbfilename=filename)
+        r.set('key', 'value')
+        result = r.get('key').decode(encoding='UTF-8')
+        self.assertEqual(result, 'value')
+        r.save()
+        r._cleanup()
+        self.assertTrue(os.path.exists(filename))
+        shutil.rmtree(temp_dir)
+
     def test_redislite_Redis_multiple_connections(self):
         # Generate a new redis server
         r = redislite.Redis()
@@ -165,7 +179,9 @@ class TestRedislite(unittest.TestCase):
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
         s = redis.Redis()
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-        self.assertEqual(r.pid, s.pid)  # Both instances should be talking to the same redis server
+
+        # Both instances should be talking to the same redis server
+        self.assertEqual(r.pid, s.pid)
         redislite.patch.unpatch_redis()
 
     def test_redislite_Redis_create_redis_directory_tree(self):
@@ -175,6 +191,35 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(r.redis_dir))
         self.assertTrue(os.path.exists(r.pidfile))
         self.assertTrue(os.path.exists(r.socket_file))
+        r._cleanup()
+
+    def test_redislite_redis_custom_socket_file_local_directory(self):
+        """
+        Test creating a redis instance with a specified socket filename
+        :return:
+        """
+        socket_file_name = 'test.socket'
+        full_socket_file_name = os.path.join(os.getcwd(), socket_file_name)
+        r = redislite.Redis(serverconfig_socketfile=socket_file_name)
+        self.assertEqual(r.socket_file, full_socket_file_name)
+        print(os.listdir('.'))
+        mode = os.stat(socket_file_name).st_mode
+        isSocket = stat.S_ISSOCK(mode)
+        self.assertTrue(isSocket)
+        r._cleanup()
+
+    def test_redislite_redis_custom_socket_file(self):
+        """
+        Test creating a redis instance with a specified socket filename
+        :return:
+        """
+        socket_file_name = '/tmp/test.socket'
+        r = redislite.Redis(serverconfig_socketfile=socket_file_name)
+        self.assertEqual(r.socket_file, socket_file_name)
+        print(os.listdir('.'))
+        mode = os.stat(socket_file_name).st_mode
+        isSocket = stat.S_ISSOCK(mode)
+        self.assertTrue(isSocket)
         r._cleanup()
 
     def test_redislite_Redis_pid(self):

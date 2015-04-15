@@ -1,3 +1,18 @@
+# Copyright (c) 2015, Yahoo Inc.
+# Copyrights licensed under the New BSD License
+# See the accompanying LICENSE.txt file for terms.
+"""
+Redislite Debug Utilities
+
+This module contains utility functions useful for troubleshooting redislite.
+
+This module can be run from the command line using the following command::
+
+    python -m redislite.debug
+
+When run from the command line this will print a dump of information about
+the module and it's build information.
+"""
 from __future__ import print_function
 from distutils.spawn import find_executable
 from .__init__ import __version__, __git_version__, __source_url__, \
@@ -7,6 +22,10 @@ import os
 
 
 def print_debug_info():
+    """
+    Display information about the redislite build, and redis-server on stdout.
+    :return:
+    """
     redis_server = find_executable('redis-server')
     if __redis_executable__:  # pragma: no cover
         redis_server = __redis_executable__

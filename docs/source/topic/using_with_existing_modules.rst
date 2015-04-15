@@ -57,6 +57,49 @@ Here is how to patch the redis_collections module to use redislite
     ['foo']
 
 
+RQ
+--
+When using rq you will need to specify a db_filename for the connection.
+
+To put jobs on queues, you don't have to do anything special, just define your typically lengthy or blocking function:
+
+.. code-block:: python
+
+    import requests
+
+    def count_words_at_url(url):
+        resp = requests.get(url)
+        return len(resp.text.split())
+
+Then, create a RQ queue:
+
+.. code-block:: python
+
+    from redislite import Redis
+    from rq import Queue
+
+    q = Queue(connection=Redis('RQ_example.rdb'))
+
+    And enqueue the function call:
+
+    from my_module import count_words_at_url
+    result = q.enqueue(
+                 count_words_at_url, 'http://nvie.com')
+
+For a more complete example, refer to the docs. But this is the essence.
+The worker
+
+To start executing enqueued function calls in the background, start a worker from your project's directory:
+
+.. code-block::
+
+    $ rqworker
+    *** Listening for work on default
+    Got count_words_at_url('http://nvie.com') from default
+    Job result = 818
+    *** Listening for work on default
+
+
 Walrus
 ------
 First, install both walrus and redislite.
