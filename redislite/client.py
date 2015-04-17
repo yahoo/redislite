@@ -325,7 +325,7 @@ class RedisMixin(object):
                 redislite instance or None.  If the redis-server is not
                 running.
         """
-        if self.pidfile:
+        if self.pidfile and os.path.exists(self.pidfile):
             with open(self.pidfile) as fh:
                 pid = fh.read().strip()
             return int(pid)
