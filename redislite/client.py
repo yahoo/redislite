@@ -61,7 +61,6 @@ class RedisMixin(object):
     redis_configuration = None
     redis_configuration_filename = None
 
-
     def _cleanup(self):
         """
         Stop the redis-server for this instance if it's running
