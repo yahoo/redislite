@@ -53,10 +53,9 @@ if os.path.exists(_metadata_file):  # pragma: no cover
         __redis_executable__ = str(_package_metadata['redis_bin'])
         __redis_server_info__ = _package_metadata['redis_server']
 
-
-if os.path.exists(os.path.join(os.path.basename(__file__), "bin/redis-server")):
+if os.path.exists(os.path.join(os.path.dirname(__file__), "bin/redis-server")):
     __redis_executable__ = os.path.join(
-        os.path.basename(__file__),
+        os.path.dirname(__file__),
         'bin/redis-server'
     )  # pragma: no cover
 

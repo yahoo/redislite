@@ -58,6 +58,8 @@ class RedisMixin(object):
     dbdir = None
     settingregistryfile = None
     cleanupregistry = False
+    redis_configuration = None
+    redis_configuration_filename = None
 
     def _cleanup(self):
         """
@@ -65,7 +67,7 @@ class RedisMixin(object):
         :return:
         """
 
-        if not self.redis_dir:
+        if not self.redis_dir:  # pragma: no cover
             return
 
         if self.running:
@@ -114,7 +116,10 @@ class RedisMixin(object):
         Start the redis server
         :return:
         """
-        config_file = os.path.join(self.redis_dir, 'redis.config')
+
+        self.redis_configuration_filename = os.path.join(
+            self.redis_dir, 'redis.config'
+        )
 
         kwargs = dict(self.server_config)
         kwargs.update(
@@ -126,16 +131,14 @@ class RedisMixin(object):
             }
         )
         # Write a redis.config to our temp directory
-        fh = open(config_file, 'w')
-        fh.write(
-            configuration.config(**kwargs)
-        )
-        fh.close()
+        self.redis_configuration = configuration.config(**kwargs)
+        with open(self.redis_configuration_filename, 'w') as file_handle:
+            file_handle.write(self.redis_configuration)
 
         redis_executable = __redis_executable__
         if not redis_executable:  # pragma: no cover
             redis_executable = 'redis-server'
-        command = [redis_executable, config_file]
+        command = [redis_executable, self.redis_configuration_filename]
         logger.debug('Running: %s', ' '.join(command))
         rc = subprocess.call(command)
         if rc:  # pragma: no cover
@@ -299,7 +302,7 @@ class RedisMixin(object):
         super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
     def __del__(self):
-        self._cleanup()
+        self._cleanup()  # pragma: no cover
 
     @property
     def db(self):
@@ -321,11 +324,11 @@ class RedisMixin(object):
                 redislite instance or None.  If the redis-server is not
                 running.
         """
-        if self.pidfile:
+        if self.pidfile and os.path.exists(self.pidfile):
             with open(self.pidfile) as fh:
                 pid = fh.read().strip()
             return int(pid)
-        return None  # pragma: no cover
+        return 0  # pragma: no cover
 
 
 class Redis(RedisMixin, redis.Redis):
