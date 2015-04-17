@@ -864,10 +864,10 @@ def settings(*args, **kwargs):
     """
     global default_settings
 
-    settings = default_settings
-    settings.update(kwargs)
+    new_settings = default_settings
+    new_settings.update(kwargs)
 
-    return settings
+    return new_settings
 
 
 def config(*args, **kwargs):
