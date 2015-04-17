@@ -269,6 +269,12 @@ class TestRedislite(unittest.TestCase):
         self.assertIsInstance(redislite.__redis_server_info__, dict)
         self.assertIsInstance(redislite.__redis_executable__, str)
 
+    def test_is_redis_running_no_pidfile(self):
+        r = redislite.Redis()
+        r.shutdown()
+        result = r._is_redis_running()
+        self.assertFalse(result)
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

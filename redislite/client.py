@@ -68,7 +68,7 @@ class RedisMixin(object):
         :return:
         """
 
-        if not self.redis_dir:
+        if not self.redis_dir:  # pragma: no cover
             return
 
         if self.running:
@@ -303,7 +303,7 @@ class RedisMixin(object):
         super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
     def __del__(self):
-        self._cleanup()
+        self._cleanup()  # pragma: no cover
 
     @property
     def db(self):
