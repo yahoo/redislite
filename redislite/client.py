@@ -329,7 +329,7 @@ class RedisMixin(object):
             with open(self.pidfile) as fh:
                 pid = fh.read().strip()
             return int(pid)
-        return None  # pragma: no cover
+        return 0  # pragma: no cover
 
 
 class Redis(RedisMixin, redis.Redis):
