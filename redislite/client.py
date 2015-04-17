@@ -171,6 +171,10 @@ class RedisMixin(object):
         if os.path.exists(self.settingregistryfile):
             with open(self.settingregistryfile) as fh:
                 settings = json.load(fh)
+
+            if not os.path.exists(settings['pidfile']):
+                return False
+
             with open(settings['pidfile']) as fh:
                 pid = fh.read().strip()   # NOQA
                 pid = int(pid)
