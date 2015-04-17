@@ -51,6 +51,10 @@ if os.path.exists(_metadata_file):  # pragma: no cover
             __git_base_url__ = __git_origin__[:-4].strip('/')
         __source_url__ = __git_base_url__ + '/tree/' + __git_hash__
         __redis_executable__ = str(_package_metadata['redis_bin'])
+        if not os.path.exists(__redis_executable__):
+            __redis_executable__ = os.path.join(
+                os.path.basename(__file__), "bin/redis-server"
+            )
         __redis_server_info__ = _package_metadata['redis_server']
 
 
