@@ -169,7 +169,7 @@ redis_collections module.
     ['foo']
 
 Finally it's possible ot spin up multiple instances with different configuration
-values for the Redis server.  Here is an example that sets 2 redis instances.
+values for the Redis server.  Here is an example that sets up 2 redis instances.
 One instance is configured to listen on port 8002, the second instance is a
 slave of the first instance.
 
