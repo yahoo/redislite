@@ -24,24 +24,13 @@ import subprocess
 # noinspection PyPep8Naming
 class TestRedisliteSlave(unittest.TestCase):
 
-
     def setUp(self):
-        subprocess.call("redis-server --port 7000 --daemonize yes --pidfile redis_master.pid".split())
-
-        self.r = redis.Redis(port=7000)
-        self.r.set('key', 'value')
-
-        time.sleep(1) # TODO: Replace with check to see if slave is finished replicating
-
-
-    def tearDown(self):
-        self.r.shutdown()
-
-
+        self.master = redislite.Redis(serverconfig={'port': '7000'})
+        self.master.set('key', 'value')
 
     def test_slave(self):
         s = redislite.Redis(serverconfig={'slaveof': 'localhost 7000'})
-
+        time.sleep(.5)
         value = s.get('key').decode(encoding='UTF-8')
         self.assertEquals(value, 'value')
 
