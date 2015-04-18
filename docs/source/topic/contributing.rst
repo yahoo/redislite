@@ -48,6 +48,7 @@ Building Codebase Familiarity by Reviewing Pull Requests
 Look at pull requests to build familiarity with the codebase and the process.  Provide comments and feedback if you see issues or can provide more information.
 
 Some things to look for:
+
 * See if the code is missing docs or tests.
 * Look through the changes a pull request makes, and keep an eye out for syntax that is incompatible with older but still supported versions of Python.
 * Make sure all the tests run and pass under all versions of python.

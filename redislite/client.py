@@ -370,10 +370,45 @@ class Redis(RedisMixin, redis.Redis):
             argument is not None, the embedded redis server will not be used.
             Defaults to None.
 
-        serverconfig_socketfile(str): The socketfile to use to connect to
-            the redis server.  If this argument is none, a unique socket
-            file will be generated and used for connection to the redis
-            server.
+        serverconfig(dict): A dictionary of additional redis-server configuration settings.  All keys and values must be str.
+            Supported keys are:
+                activerehashing,
+                aof_rewrite_incremental_fsync,
+                appendfilename,
+                appendfsync,
+                appendonly,
+                auto_aof_rewrite_min_size,
+                auto_aof_rewrite_percentage,
+                aof_load_truncated,
+                databases,
+                hash_max_ziplist_entries,
+                hash_max_ziplist_value,
+                hll_sparse_max_bytes,
+                hz,
+                latency_monitor_threshold,
+                list_max_ziplist_entries,
+                list_max_ziplist_value,
+                logfile,
+                loglevel,
+                lua_time_limit,
+                no_appendfsync_on_rewrite,
+                notify_keyspace_events,
+                port,
+                rdbchecksum,
+                rdbcompression,
+                repl_disable_tcp_nodelay,
+                slave_read_only,
+                slave_serve_stale_data,
+                stop_writes_on_bgsave_error,
+                tcp_backlog,
+                tcp_keepalive,
+                unixsocket,
+                unixsocketperm,
+                slave_priority,
+                timeout,
+                set_max_intset_entries,
+                zset_max_ziplist_entries,
+                zset_max_ziplist_value
 
     Returns:
         A :class:`redis.Redis()` class object if the host or port arguments
@@ -439,10 +474,45 @@ class StrictRedis(RedisMixin, redis.StrictRedis):
             not None, the embedded redis server will not be used.  Defaults to
             None.
 
-        serverconfig_socketfile(str): The socketfile to use to connect to
-            the redis server.  If this argument is none, a unique socket
-            file will be generated and used for connection to the redis
-            server.
+        serverconfig(dict): A dictionary of additional redis-server configuration settings.  All keys and values must be str.
+            Supported keys are:
+                activerehashing,
+                aof_rewrite_incremental_fsync,
+                appendfilename,
+                appendfsync,
+                appendonly,
+                auto_aof_rewrite_min_size,
+                auto_aof_rewrite_percentage,
+                aof_load_truncated,
+                databases,
+                hash_max_ziplist_entries,
+                hash_max_ziplist_value,
+                hll_sparse_max_bytes,
+                hz,
+                latency_monitor_threshold,
+                list_max_ziplist_entries,
+                list_max_ziplist_value,
+                logfile,
+                loglevel,
+                lua_time_limit,
+                no_appendfsync_on_rewrite,
+                notify_keyspace_events,
+                port,
+                rdbchecksum,
+                rdbcompression,
+                repl_disable_tcp_nodelay,
+                slave_read_only,
+                slave_serve_stale_data,
+                stop_writes_on_bgsave_error,
+                tcp_backlog,
+                tcp_keepalive,
+                unixsocket,
+                unixsocketperm,
+                slave_priority,
+                timeout,
+                set_max_intset_entries,
+                zset_max_ziplist_entries,
+                zset_max_ziplist_value
 
     Returns:
         A :class:`redis.StrictRedis()` class object if the host or port
