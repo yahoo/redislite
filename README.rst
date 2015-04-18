@@ -168,6 +168,29 @@ redis_collections module.
     >>> td.keys()
     ['foo']
 
+Finally it's possible ot spin up multiple instances with different configuration
+values for the Redis server.  Here is an example that sets 2 redis instances.
+One instance is configured to listen on port 8002, the second instance is a
+slave of the first instance.
+
+
+.. code-block:: python
+
+    Python 2.7.6 (default, Mar 22 2014, 22:59:56)
+    [GCC 4.8.2] on linux2
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> import redislite
+    >>> master=redislite.Redis(serverconfig={'port': '8002'})
+    >>> slave=redislite.Redis(serverconfig={'slaveof': "127.0.0.1 8002"})
+    >>> slave.keys()
+    []
+    >>> master.set('key', 'value')
+    True
+    >>> master.keys()
+    ['key']
+    >>> slave.keys()
+    ['key']
+    >>>
 
 More Information
 ================
