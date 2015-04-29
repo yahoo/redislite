@@ -8,8 +8,11 @@ test_redislite
 Tests for `redislite` module.
 """
 from __future__ import print_function
+import getpass
+import inspect
 import logging
 import os
+import psutil
 import redislite
 import redislite.patch
 import shutil
@@ -18,10 +21,53 @@ import tempfile
 import unittest
 
 
+logger = logging.getLogger(__name__)
+
+
 # noinspection PyPep8Naming
 class TestRedislite(unittest.TestCase):
+
+    class logger(object):
+        @staticmethod
+        def debug(*args, **kwargs):
+            new_args = list(args)
+            new_args[0] = str(inspect.stack()[1][3]) + ': ' + new_args[0]
+            args=tuple(new_args)
+            return logger.debug(*args, **kwargs)
+
+    def _redis_server_processes(self):
+        """
+        Return count of process objects for all redis-server processes started
+        by the current user.
+        :return:
+        """
+        import psutil
+
+        processes = []
+        for proc in psutil.process_iter():
+            try:
+                if proc.name() == 'redis-server':
+                    if proc.username() == getpass.getuser():
+                        processes.append(proc)
+            except psutil.NoSuchProcess:
+                pass
+
+        return len(processes)
+
+    def _log_redis_pid(self, connection):
+        logger.debug(
+            '%s: r.pid: %d', str(inspect.stack()[1][3]), connection.pid
+        )
+
     def setUp(self):
-        pass
+        logger.info(
+            'Start Child processes: %d', self._redis_server_processes()
+        )
+
+    def tearDown(self):
+        logger.info(
+            'End Child processes: %d', self._redis_server_processes()
+        )
 
     def test_debug(self):
         import redislite.debug
@@ -87,6 +133,8 @@ class TestRedislite(unittest.TestCase):
 
     def test_redislite_Redis(self):
         r = redislite.Redis()
+        self._log_redis_pid(r)
+
         r.set('key', 'value')
         result = r.get('key').decode(encoding='UTF-8')
         self.assertEqual(result, 'value')
@@ -94,6 +142,9 @@ class TestRedislite(unittest.TestCase):
     def test_redislite_Redis_multiple(self):
         r1 = redislite.Redis()
         r2 = redislite.Redis()
+        self._log_redis_pid(r1)
+        self._log_redis_pid(r2)
+
         r1.set('key', 'value')
         r2.set('key2', 'value2')
         self.assertTrue(len(r1.keys()), 1)
@@ -108,6 +159,7 @@ class TestRedislite(unittest.TestCase):
         filename = os.path.join(temp_dir, 'redis.db')
         self.assertFalse(os.path.exists(filename))
         r = redislite.Redis(filename)
+        self._log_redis_pid(r)
         r.set('key', 'value')
         result = r.get('key').decode(encoding='UTF-8')
         self.assertEqual(result, 'value')
@@ -121,6 +173,7 @@ class TestRedislite(unittest.TestCase):
         filename = os.path.join(temp_dir, 'redis.db')
         self.assertFalse(os.path.exists(filename))
         r = redislite.Redis(dbfilename=filename)
+        self._log_redis_pid(r)
         r.set('key', 'value')
         result = r.get('key').decode(encoding='UTF-8')
         self.assertEqual(result, 'value')
@@ -132,9 +185,11 @@ class TestRedislite(unittest.TestCase):
     def test_redislite_Redis_multiple_connections(self):
         # Generate a new redis server
         r = redislite.Redis()
+        self._log_redis_pid(r)
 
         # Pass the first server's db to get a second connection
         s = redislite.Redis(r.db)
+        self._log_redis_pid(s)
         r.set('key', 'value')
         result = s.get('key').decode(encoding='UTF-8')
         self.assertEqual(result, 'value')
@@ -144,6 +199,7 @@ class TestRedislite(unittest.TestCase):
 
     def test_redislite_Redis_cleanup(self):
         r = redislite.Redis()
+        self._log_redis_pid(r)
         r._cleanup()
         self.assertIsNone(r.socket_file)
 
@@ -152,6 +208,7 @@ class TestRedislite(unittest.TestCase):
         redislite.patch.patch_redis_Redis()
         import redis
         r = redis.Redis()
+        self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
         redislite.patch.unpatch_redis_Redis()
 
@@ -159,6 +216,7 @@ class TestRedislite(unittest.TestCase):
         redislite.patch.patch_redis_StrictRedis()
         import redis
         r = redis.StrictRedis()
+        self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
         redislite.patch.unpatch_redis_StrictRedis()
 
@@ -167,8 +225,10 @@ class TestRedislite(unittest.TestCase):
         redislite.patch.patch_redis()
         import redis
         r = redis.Redis()
+        self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
         s = redis.StrictRedis()
+        self._log_redis_pid(s)
         self.assertIsInstance(s.pid, int)    # Should have a redislite pid
         redislite.patch.unpatch_redis()
 
@@ -189,8 +249,10 @@ class TestRedislite(unittest.TestCase):
         redislite.patch.patch_redis(dbfilename)
         import redis
         r = redis.Redis()
+        self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
         s = redis.Redis()
+        self._log_redis_pid(s)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
 
         # Both instances should be talking to the same redis server
@@ -199,6 +261,7 @@ class TestRedislite(unittest.TestCase):
 
     def test_redislite_Redis_create_redis_directory_tree(self):
         r = redislite.Redis()
+        self._log_redis_pid(r)
         r._create_redis_directory_tree()
         self.assertTrue(r.redis_dir)
         self.assertTrue(os.path.exists(r.redis_dir))
@@ -214,6 +277,7 @@ class TestRedislite(unittest.TestCase):
         socket_file_name = 'test.socket'
         full_socket_file_name = os.path.join(os.getcwd(), socket_file_name)
         r = redislite.Redis(unix_socket_path=socket_file_name)
+        self._log_redis_pid(r)
         self.assertEqual(r.socket_file, full_socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
@@ -228,6 +292,7 @@ class TestRedislite(unittest.TestCase):
         """
         socket_file_name = '/tmp/test.socket'
         r = redislite.Redis(unix_socket_path=socket_file_name)
+        self._log_redis_pid(r)
         self.assertEqual(r.socket_file, socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
@@ -237,6 +302,7 @@ class TestRedislite(unittest.TestCase):
 
     def test_redislite_Redis_pid(self):
         r = redislite.Redis()
+        self._log_redis_pid(r)
         self.assertTrue(r.pidfile)
         self.assertGreater(r.pid, 0)
 
@@ -245,6 +311,7 @@ class TestRedislite(unittest.TestCase):
         if os.path.exists(test_db):
             os.remove(test_db)
         r = redislite.Redis(test_db)
+        self._log_redis_pid(r)
         r.set('key', 'value')
         r.save()
         self.assertTrue(os.path.exists(test_db))
@@ -255,6 +322,7 @@ class TestRedislite(unittest.TestCase):
         if os.path.exists(test_db):
             os.remove(test_db)
         r = redislite.Redis(dbfilename=test_db)
+        self._log_redis_pid(r)
         r.set('key', 'value')
         r.save()
         self.assertTrue(os.path.exists(test_db))
@@ -271,9 +339,62 @@ class TestRedislite(unittest.TestCase):
 
     def test_is_redis_running_no_pidfile(self):
         r = redislite.Redis()
+        self._log_redis_pid(r)
         r.shutdown()
         result = r._is_redis_running()
         self.assertFalse(result)
+
+    def test_refcount_cleanup(self):
+        self.logger.debug('Setting up 2 connections to a single redis server.')
+        r = redislite.Redis()
+        self._log_redis_pid(r)
+        s = redislite.Redis(r.db)
+        self._log_redis_pid(s)
+
+        pid = r.pid
+        redis_dir = r.redis_dir
+
+        self.logger.debug('Making sure the redis-server is running')
+        p = psutil.Process(pid)
+        self.assertTrue(p.is_running())
+
+        self.logger.debug(
+            'Shuting down the first instance, redis-server should remain '
+            'running due to the other connection.'
+        )
+        r._cleanup()
+
+        self.assertTrue(
+            os.path.exists(redis_dir),
+            msg='Shutting down the server removed the temporary directory'
+        )
+        self.assertEqual(
+            s.pid, pid,
+            msg='Redis server shutdown with active connection'
+        )
+
+        p = psutil.Process(pid)
+        self.assertTrue(
+            p.is_running(),
+            msg='Redis server shutdown with active connection'
+        )
+
+        self.logger.debug(
+            'Shutting down  the second instance, the redis-server should '
+            'be gone after the connection terminates'
+        )
+        self.logger.debug(
+            'Second connection count is: %s', s._connection_count()
+        )
+        s._cleanup()
+        with self.assertRaises(psutil.NoSuchProcess):
+            p = psutil.Process(pid)
+
+
+    def test_connection_count(self):
+        r = redislite.Redis()
+        self._log_redis_pid(r)
+        self.assertEqual(r._connection_count(), 1)
 
 
 if __name__ == '__main__':
