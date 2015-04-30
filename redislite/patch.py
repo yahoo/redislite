@@ -54,6 +54,8 @@ def patch_redis_Redis(dbfile=None):
         return
 
     if dbfile:
+        if dbfile == os.path.basename(dbfile):
+            dbfile = os.path.join(os.getcwd(), dbfile)
         Redis.dbdir = os.path.dirname(dbfile)
         Redis.dbfilename = os.path.basename(dbfile)
         Redis.settingregistryfile = os.path.join(
@@ -118,6 +120,8 @@ def patch_redis_StrictRedis(dbfile=None):
         return
 
     if dbfile:
+        if dbfile == os.path.basename(dbfile):
+            dbfile = os.path.join(os.getcwd(), dbfile)
         StrictRedis.dbdir = os.path.dirname(dbfile)
         StrictRedis.dbfilename = os.path.basename(dbfile)
         StrictRedis.settingregistryfile = os.path.join(
