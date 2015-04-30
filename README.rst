@@ -60,21 +60,24 @@ On Redhat/Fedora systems, install them with:
 
     yum install python-devel
     
-On Mac OSX you will need the XCode command line utilities installed.  If you do not have xcode installed on recent OSX
-releases they can be installed by running:
+On Mac OSX you may need the XCode command line utilities installed.  If you do
+not have xcode installed on recent OSX releases they can be installed by
+running:
 
 .. code-block::
 
     xcode-select --install
 
-Note redislite and its dependecies use the gcc compiler. On OSX you may run into errors indicating that your
-machine is using clang to compile instead, for example:
+Note redislite and its dependencies use the gcc compiler. On OSX you may run
+into errors indicating that your machine is using clang to compile instead, for
+example:
 
 .. code-block::
 
     clang: error: unknown argument: '-mno-fused-madd' [-Wunused-command-line-argument-hard-error-in-future]
 
-If this is the case, set your environment variable to override the use of clang in favor of gcc:
+If this is the case, set your environment variable to override the use of clang
+in favor of gcc:
 
 .. code-block::
 
@@ -195,6 +198,8 @@ slave of the first instance.
 More Information
 ================
 
-There is more detailed information on the redislite documentation page at http://redislite.readthedocs.org/en/latest/
+There is more detailed information on the redislite documentation page at
+http://redislite.readthedocs.org/en/latest/
 
-Redislite is Free software under the New BSD license, see LICENSE.txt for details
+Redislite is Free software under the New BSD license, see LICENSE.txt for
+details.
