@@ -20,8 +20,9 @@ StrictRedis_Patched = False
 
 def patch_redis_Redis(dbfile=None):
     """
-    This class patches the redis module to replace the :class:`redis.Redis()` class with the redislite enahanced
-    :class:`redislite.Redis()` class that uses the embedded redis server.
+    This class patches the redis module to replace the :class:`redis.Redis()`
+    class with the redislite enhanced :class:`redislite.Redis()` class that uses
+    the embedded redis server.
 
 
     Example:
@@ -29,22 +30,20 @@ def patch_redis_Redis(dbfile=None):
 
 
     Notes:
-        If the dbfile parameter is not passed, each any instances of redis.Redis() class with no arguments will get a
-        unique instance of the redis server.  If the dbfile parameter is provided, all instances of redis.Redis()
-        class without a host or part argument will share/reference the same instance of the redis server.
+        If the dbfile parameter is not passed, each instance of the
+        redis.Redis() class with no arguments will get a separate redis
+        server.  If the dbfile parameter is provided, all instances of
+        the redis.Redis() class without a host or path argument will
+        share/reference the same redis server.
 
     Args:
         dbfile(str):
-            The name of the Redis db file to be used.  If this argument is passed all instances of the
-            :class:`redis.Redis` class will share a single instance of the embedded redis server.
+            The name of the Redis db file to be used.  If this argument is
+            passed all instances of the :class:`redis.Redis` class will share a
+            single embedded redis server.
 
     Returns:
         This function does not return any values.
-
-
-    Raises:
-
-
     """
     global original_classes
     global Redis_Patched
