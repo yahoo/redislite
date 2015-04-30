@@ -13,6 +13,8 @@ from .client import Redis, StrictRedis
 
 
 logger = logging.getLogger(__name__)
+
+
 original_classes = collections.defaultdict(lambda: None)  # pragma: no cover
 Redis_Patched = False
 StrictRedis_Patched = False
@@ -68,8 +70,8 @@ def patch_redis_Redis(dbfile=None):
 
 def unpatch_redis_Redis():
     """
-    This class unpatches the :class:`redis.Redis()` class of the redis module and restores the original
-    :class:`redis.Redis()`  class.
+    This class unpatches the :class:`redis.Redis()` class of the redis module
+    and restores the original :class:`redis.Redis()`  class.
 
 
     Example:
@@ -90,7 +92,9 @@ def unpatch_redis_Redis():
 
 def patch_redis_StrictRedis(dbfile=None):
     """
-    This class patches the redis module to replace the :class:`redis.StrictRedis()` class with the redislite enahanced
+    This class patches the redis module to replace the
+    :param dbfile:
+    :class:`redis.StrictRedis()` class with the redislite enhanced
     :class:`redislite.StrictRedis()` class that uses the embedded redis server.
 
 
@@ -99,9 +103,11 @@ def patch_redis_StrictRedis(dbfile=None):
 
 
     Notes:
-        If the dbfile parameter is not passed, each any instances of :class:`redis.StrictRedis()` class with no
-        arguments will get a unique instance of the redis server.  If the dbfile parameter is provided, all instances
-        of :class:`redis.Redis()` will share/reference the same instance of the redis server.
+        If the dbfile parameter is not passed, all :class:`redis.StrictRedis()`
+        class with no arguments will get a separate redis server.  If the
+        dbfile parameter is provided, all instances of the
+        :class:`redis.Redis()` class passed with the same dbfile value
+        will share/reference the same redis server.
 
     Args:
         dbfile(str):
@@ -134,8 +140,8 @@ def patch_redis_StrictRedis(dbfile=None):
 
 def unpatch_redis_StrictRedis():
     """
-    This class unpatches the :class:`redis.StrictRedis()` class of the redis module and restores the original
-    :class:`redis.StrictRedis()`  class.
+    This class unpatches the :class:`redis.StrictRedis()` class of the redis
+    module and restores the original :class:`redis.StrictRedis()`  class.
 
 
     Example:
