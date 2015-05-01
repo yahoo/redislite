@@ -10,10 +10,12 @@ from jinja2 import Template
 
 
 import logging
+
+
 logger = logging.getLogger(__name__)
 
-template = Template("""
-# Redis configuration file example
+
+REDIS_SERVER_TEMPLATE = Template("""# Redis configuration file example
 
 # Note on units: when memory size is needed, it is possible to specify
 # it in the usual form of 1k 5GB 4M and so forth:
@@ -810,7 +812,9 @@ hz {{ 10 }}
 # big latency spikes.
 aof-rewrite-incremental-fsync {{ aof_rewrite_incremental_fsync }}
 """)
-default_settings = {
+
+
+DEFAULT_REDIS_SETTINGS = {
     'daemonize': 'yes',
     'pidfile': '/var/run/redislite/redis.pid',
     'tcp_backlog': '511',
@@ -857,27 +861,20 @@ default_settings = {
 }
 
 
-def settings(*args, **kwargs):
+def settings(**kwargs):
     """
     Return a config settings based on the defaults and the arguments passed
     :return:
     """
-    global default_settings
-
-    new_settings = default_settings
+    new_settings = dict(DEFAULT_REDIS_SETTINGS)
     new_settings.update(kwargs)
 
     return new_settings
 
 
-def config(*args, **kwargs):
+def config(**kwargs):
     """
     Generate a redis configuration file based on the passed arguments
     :return:
     """
-    global default_settings
-
-    settings = dict(default_settings)
-    settings.update(kwargs)
-
-    return template.render(settings)
+    return REDIS_SERVER_TEMPLATE.render(**settings(**kwargs))

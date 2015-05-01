@@ -67,35 +67,65 @@ class RedisMixin(object):
         :return:
         """
 
-        if not self.redis_dir:  # pragma: no cover
-            return
+        if self.pid:
+            logger.debug('Connection count: %s', self._connection_count())
+            if self._connection_count() <= 1:
+                logger.debug(
+                    'Last client using the connection, shutting down the redis '
+                    'connection on socket: %s',
+                    self.socket_file
+                )
+                # noinspection PyUnresolvedReferences
+                logger.debug(
+                    'Shutting down redis server with pid of %d', self.pid
+                )
+                self.shutdown()
+                self.socket_file = None
 
-        if self.running:
+                if self.pidfile and os.path.exists(self.pidfile):   # pragma: no cover
+                    # noinspection PyTypeChecker
+                    pid = int(open(self.pidfile).read())
+                    os.kill(pid, signal.SIGKILL)
+
+                if self.redis_dir and os.path.isdir(self.redis_dir):  # pragma: no cover
+                    shutil.rmtree(self.redis_dir)
+
+                if self.cleanupregistry and os.path.exists(
+                        self.settingregistryfile
+                ):
+                    os.remove(self.settingregistryfile)
+                    self.settingregistryfile = None
+            else:
+                logger.debug(
+                    'Other clients are still connected to the redis server, '
+                    'not shutting down the connection on socket: %s',
+                    self.socket_file
+                )
+                self.connection_pool.disconnect()
+        else:
             logger.debug(
-                'Shutting down the redis connection on socket: %s',
+                'Redis is not running on socket %s, skipping cleanup',
                 self.socket_file
-            )
-            # noinspection PyUnresolvedReferences
-            logger.debug(
-                'Shutting down redis server with pid of %d' % self.pid)
-            self.shutdown()
-            self.socket_file = None
-
-        if self.pidfile and os.path.exists(self.pidfile):   # pragma: no cover
-            # noinspection PyTypeChecker
-            pid = int(open(self.pidfile).read())
-            os.kill(pid, signal.SIGKILL)
-
-        if os.path.isdir(self.redis_dir):  # pragma: no cover
-            shutil.rmtree(self.redis_dir)
-
-        if self.cleanupregistry and os.path.exists(self.settingregistryfile):
-            os.remove(self.settingregistryfile)
-            self.settingregistryfile = None
+            )  # pragma: no cover
 
         self.running = False
         self.redis_dir = None
         self.pidfile = None
+
+    def _connection_count(self):
+        """
+        Return the number of active connections to the redis server.
+        :return:
+        """
+        if not self._is_redis_running():  # pragma: no cover
+            return 0
+        active_connections = 0
+        for client in self.client_list():
+            flags = client.get('flags', '')
+            flags = flags.upper()
+            if 'U' in flags or 'N' in flags:
+                active_connections += 1
+        return active_connections
 
     def _create_redis_directory_tree(self):
         """
@@ -172,18 +202,21 @@ class RedisMixin(object):
             return False
 
         if os.path.exists(self.settingregistryfile):
-            with open(self.settingregistryfile) as fh:
-                settings = json.load(fh)
+            with open(self.settingregistryfile) as file_handle:
+                settings = json.load(file_handle)
 
             if not os.path.exists(settings['pidfile']):
                 return False
 
-            with open(settings['pidfile']) as fh:
-                pid = fh.read().strip()   # NOQA
+            with open(settings['pidfile']) as file_handle:
+                pid = file_handle.read().strip()   # NOQA
                 pid = int(pid)
                 if pid:  # pragma: no cover
-                    p = psutil.Process(pid)
-                    if not p.is_running():
+                    try:
+                        process = psutil.Process(pid)
+                    except psutil.NoSuchProcess:
+                        return False
+                    if not process.is_running():
                         return False
                 else:  # pragma: no cover
                     return False
@@ -220,8 +253,8 @@ class RedisMixin(object):
             with open(pidfile) as fh:
                 pid_number = int(fh.read())
             if pid_number:
-                p = psutil.Process(pid_number)
-                if not p.is_running():  # pragma: no cover
+                process = psutil.Process(pid_number)
+                if not process.is_running():  # pragma: no cover
                     logger.warn('Loaded registry for non-existant redis-server')
                     return
         else:  # pragma: no cover
@@ -243,8 +276,7 @@ class RedisMixin(object):
         # If the user is specifying settings we can't configure just pass the
         # request to the redis.Redis module
         if 'host' in kwargs.keys() or 'port' in kwargs.keys():
-            # noinspection PyArgumentList,PyPep8
-            return super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
+            super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
         self.socket_file = kwargs.get('unix_socket_path', None)
         if self.socket_file and self.socket_file == os.path.basename(self.socket_file):
@@ -301,6 +333,9 @@ class RedisMixin(object):
         logger.debug('Calling binding with %s, %s', args, kwargs)
         super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
+        logger.debug("Pinging the server to ensure we're connected")
+        self.ping()
+
     def __del__(self):
         self._cleanup()  # pragma: no cover
 
@@ -325,8 +360,17 @@ class RedisMixin(object):
                 running.
         """
         if self.pidfile and os.path.exists(self.pidfile):
-            with open(self.pidfile) as fh:
-                pid = fh.read().strip()
+            with open(self.pidfile) as file_handle:
+                pid = int(file_handle.read().strip())
+                if pid:  # pragma: no cover
+                    try:
+                        process = psutil.Process(pid)
+                    except psutil.NoSuchProcess:
+                        return 0
+                    if not process.is_running():
+                        return 0
+                else:  # pragma: no cover
+                    return 0
             return int(pid)
         return 0  # pragma: no cover
 
@@ -370,7 +414,8 @@ class Redis(RedisMixin, redis.Redis):
             argument is not None, the embedded redis server will not be used.
             Defaults to None.
 
-        serverconfig(dict): A dictionary of additional redis-server configuration settings.  All keys and values must be str.
+        serverconfig(dict): A dictionary of additional redis-server
+            configuration settings.  All keys and values must be str.
             Supported keys are:
                 activerehashing,
                 aof_rewrite_incremental_fsync,
@@ -474,7 +519,8 @@ class StrictRedis(RedisMixin, redis.StrictRedis):
             not None, the embedded redis server will not be used.  Defaults to
             None.
 
-        serverconfig(dict): A dictionary of additional redis-server configuration settings.  All keys and values must be str.
+        serverconfig(dict): A dictionary of additional redis-server
+            configuration settings.  All keys and values must be str.
             Supported keys are:
                 activerehashing,
                 aof_rewrite_incremental_fsync,
