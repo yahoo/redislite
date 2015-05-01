@@ -37,8 +37,6 @@ class TestRedisliteClient(unittest.TestCase):
         by the current user.
         :return:
         """
-        import psutil
-
         processes = []
         for proc in psutil.process_iter():
             try:
