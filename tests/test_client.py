@@ -2,10 +2,7 @@
 # Copyrights licensed under the New BSD License
 # See the accompanying LICENSE.txt file for terms.
 """
-test_redislite
-----------------------------------
-
-Tests for `redislite` module.
+Tests for `redislite.client` module.
 """
 from __future__ import print_function
 import getpass
@@ -14,7 +11,6 @@ import logging
 import os
 import psutil
 import redislite
-import redislite.patch
 import shutil
 import stat
 import tempfile
@@ -25,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 # noinspection PyPep8Naming
-class TestRedislite(unittest.TestCase):
+class TestRedisliteClient(unittest.TestCase):
 
     class logger(object):
         @staticmethod
@@ -68,68 +64,6 @@ class TestRedislite(unittest.TestCase):
         logger.info(
             'End Child processes: %d', self._redis_server_processes()
         )
-
-    def test_debug(self):
-        import redislite.debug
-        redislite.debug.print_debug_info()
-
-    def test_configuration_config(self):
-        import redislite.configuration
-        result = redislite.configuration.config()
-        self.assertIn('\ndaemonize yes', result)
-
-
-    def test_configuration_modify_defaults(self):
-        import redislite.configuration
-        result = redislite.configuration.config(daemonize="no")
-        self.assertIn('\ndaemonize no', result)
-
-        # ensure the global defaults are not modified
-        self.assertEquals(redislite.configuration.default_settings["daemonize"], "yes")
-
-
-    def test_configuration_settings(self):
-        import redislite.configuration
-        result = redislite.configuration.settings()
-        result_set = set(result.items())
-        expected_subset = set(
-            {
-                'dbdir': './',
-                'daemonize': 'yes',
-                'unixsocketperm': '700',
-                'timeout': '0',
-                'dbfilename': 'redis.db'
-            }.items()
-        )
-        self.assertTrue(
-            expected_subset.issubset(result_set)
-        )
-
-
-    def test_configuration_config_db(self):
-        import redislite.configuration
-        result = redislite.configuration.config(
-                pidfile='/var/run/redislite/test.pid',
-                unixsocket='/var/run/redislite/redis.socket',
-                dbdir=os.getcwd(),
-                dbfilename='test.db',
-        )
-
-        self.assertIn('\ndaemonize yes', result)
-        self.assertIn('\npidfile /var/run/redislite/test.pid', result)
-        self.assertIn('\ndbfilename test.db', result)
-
-    def test_configuration_config_slave(self):
-        import redislite.configuration
-        result = redislite.configuration.config(
-                pidfile='/var/run/redislite/test.pid',
-                unixsocket='/var/run/redislite/redis.socket',
-                dbdir=os.getcwd(),
-                dbfilename='test.db',
-                slaveof='localhost 6397'
-        )
-        self.assertIn(' slaveof localhost 6397', result)
-
 
     def test_redislite_Redis(self):
         r = redislite.Redis()
@@ -203,79 +137,6 @@ class TestRedislite(unittest.TestCase):
         r._cleanup()
         self.assertIsNone(r.socket_file)
 
-    # noinspection PyUnresolvedReferences
-    def test_redislite_patch_redis_Redis(self):
-        redislite.patch.patch_redis_Redis()
-        import redis
-        r = redis.Redis()
-        self._log_redis_pid(r)
-        self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-        redislite.patch.unpatch_redis_Redis()
-
-    def test_redislite_patch_redis_StrictRedis(self):
-        redislite.patch.patch_redis_StrictRedis()
-        import redis
-        r = redis.StrictRedis()
-        self._log_redis_pid(r)
-        self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-        redislite.patch.unpatch_redis_StrictRedis()
-
-    # noinspection PyUnusedLocal
-    def test_redislite_patch_redis(self):
-        redislite.patch.patch_redis()
-        import redis
-        r = redis.Redis()
-        self._log_redis_pid(r)
-        self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-        s = redis.StrictRedis()
-        self._log_redis_pid(s)
-        self.assertIsInstance(s.pid, int)    # Should have a redislite pid
-        redislite.patch.unpatch_redis()
-
-    def test_redislite_double_patch_redis(self):
-        import redis
-        original_redis = redis.Redis
-        redislite.patch.patch_redis()
-        self.assertNotEqual(original_redis, redis.Redis)
-        redislite.patch.patch_redis()
-        self.assertNotEqual(original_redis, redis.Redis)
-        redislite.patch.unpatch_redis()
-        self.assertEqual(original_redis, redis.Redis)
-
-    def test_redislite_patch_redis_with_dbfile(self):
-        dbfilename = '/tmp/test_redislite_patch_redis_with_dbfile.db'
-        if os.path.exists(dbfilename):
-            os.remove(dbfilename)
-        redislite.patch.patch_redis(dbfilename)
-        import redis
-        r = redis.Redis()
-        self._log_redis_pid(r)
-        self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-        s = redis.Redis()
-        self._log_redis_pid(s)
-        self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-
-        # Both instances should be talking to the same redis server
-        self.assertEqual(r.pid, s.pid)
-        redislite.patch.unpatch_redis()
-
-    def test_redislite_patch_redis_with_dbfile(self):
-        dbfilename = 'test_redislite_patch_redis_with_short_dbfile.db'
-        if os.path.exists(dbfilename):
-            os.remove(dbfilename)
-        redislite.patch.patch_redis(dbfilename)
-        import redis
-        r = redis.Redis()
-        self._log_redis_pid(r)
-        self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-        s = redis.Redis()
-        self._log_redis_pid(s)
-        self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-
-        # Both instances should be talking to the same redis server
-        self.assertEqual(r.pid, s.pid)
-        redislite.patch.unpatch_redis()
-
     def test_redislite_Redis_create_redis_directory_tree(self):
         r = redislite.Redis()
         self._log_redis_pid(r)
@@ -345,15 +206,6 @@ class TestRedislite(unittest.TestCase):
         self.assertTrue(os.path.exists(test_db))
         os.remove(test_db)
 
-    def test_metadata(self):
-        self.assertIsInstance(redislite.__version__, str)
-        self.assertIsInstance(redislite.__git_version__, str)
-        self.assertIsInstance(redislite.__git_origin__, str)
-        self.assertIsInstance(redislite.__git_branch__, str)
-        self.assertIsInstance(redislite.__git_hash__, str)
-        self.assertIsInstance(redislite.__redis_server_info__, dict)
-        self.assertIsInstance(redislite.__redis_executable__, str)
-
     def test_is_redis_running_no_pidfile(self):
         r = redislite.Redis()
         self._log_redis_pid(r)
@@ -407,14 +259,21 @@ class TestRedislite(unittest.TestCase):
         with self.assertRaises(psutil.NoSuchProcess):
             p = psutil.Process(pid)
 
-
     def test_connection_count(self):
         r = redislite.Redis()
         self._log_redis_pid(r)
         self.assertEqual(r._connection_count(), 1)
 
+    def test_connection_count_multiple(self):
+        r = redislite.Redis()
+        self._log_redis_pid(r)
+        s = redislite.Redis(r.db)
+        self.assertEqual(r._connection_count(), 2)
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    test_suite = unittest.TestLoader().loadTestsFromTestCase(TestRedislite)
+    test_suite = unittest.TestLoader().loadTestsFromTestCase(
+        TestRedisliteClient
+    )
     unittest.TextTestRunner(verbosity=2).run(test_suite)

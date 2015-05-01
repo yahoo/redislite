@@ -67,9 +67,6 @@ class RedisMixin(object):
         :return:
         """
 
-        #if not self.redis_dir:  # pragma: no cover
-        #    return
-
         if self.pid:
             logger.debug('Connection count: %s', self._connection_count())
             if self._connection_count() <= 1:
@@ -367,7 +364,7 @@ class RedisMixin(object):
                     except psutil.NoSuchProcess:
                         return 0
                     if not p.is_running():
-                        return pid
+                        return 0
                 else:  # pragma: no cover
                     return 0
             return int(pid)
