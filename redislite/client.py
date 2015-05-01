@@ -77,7 +77,8 @@ class RedisMixin(object):
                 )
                 # noinspection PyUnresolvedReferences
                 logger.debug(
-                    'Shutting down redis server with pid of %d' % self.pid)
+                    'Shutting down redis server with pid of %d', self.pid
+                )
                 self.shutdown()
                 self.socket_file = None
 
@@ -112,6 +113,10 @@ class RedisMixin(object):
         self.pidfile = None
 
     def _connection_count(self):
+        """
+        Return the number of active connections to the redis server.
+        :return:
+        """
         if not self._is_redis_running():  # pragma: no cover
             return 0
         active_connections = 0
@@ -197,21 +202,21 @@ class RedisMixin(object):
             return False
 
         if os.path.exists(self.settingregistryfile):
-            with open(self.settingregistryfile) as fh:
-                settings = json.load(fh)
+            with open(self.settingregistryfile) as file_handle:
+                settings = json.load(file_handle)
 
             if not os.path.exists(settings['pidfile']):
                 return False
 
-            with open(settings['pidfile']) as fh:
-                pid = fh.read().strip()   # NOQA
+            with open(settings['pidfile']) as file_handle:
+                pid = file_handle.read().strip()   # NOQA
                 pid = int(pid)
                 if pid:  # pragma: no cover
                     try:
-                        p = psutil.Process(pid)
+                        process = psutil.Process(pid)
                     except psutil.NoSuchProcess:
                         return False
-                    if not p.is_running():
+                    if not process.is_running():
                         return False
                 else:  # pragma: no cover
                     return False
@@ -248,8 +253,8 @@ class RedisMixin(object):
             with open(pidfile) as fh:
                 pid_number = int(fh.read())
             if pid_number:
-                p = psutil.Process(pid_number)
-                if not p.is_running():  # pragma: no cover
+                process = psutil.Process(pid_number)
+                if not process.is_running():  # pragma: no cover
                     logger.warn('Loaded registry for non-existant redis-server')
                     return
         else:  # pragma: no cover
@@ -271,8 +276,7 @@ class RedisMixin(object):
         # If the user is specifying settings we can't configure just pass the
         # request to the redis.Redis module
         if 'host' in kwargs.keys() or 'port' in kwargs.keys():
-            # noinspection PyArgumentList,PyPep8
-            return super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
+            super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
         self.socket_file = kwargs.get('unix_socket_path', None)
         if self.socket_file and self.socket_file == os.path.basename(self.socket_file):
@@ -356,14 +360,14 @@ class RedisMixin(object):
                 running.
         """
         if self.pidfile and os.path.exists(self.pidfile):
-            with open(self.pidfile) as fh:
-                pid = int(fh.read().strip())
+            with open(self.pidfile) as file_handle:
+                pid = int(file_handle.read().strip())
                 if pid:  # pragma: no cover
                     try:
-                        p = psutil.Process(pid)
+                        process = psutil.Process(pid)
                     except psutil.NoSuchProcess:
                         return 0
-                    if not p.is_running():
+                    if not process.is_running():
                         return 0
                 else:  # pragma: no cover
                     return 0
@@ -410,7 +414,8 @@ class Redis(RedisMixin, redis.Redis):
             argument is not None, the embedded redis server will not be used.
             Defaults to None.
 
-        serverconfig(dict): A dictionary of additional redis-server configuration settings.  All keys and values must be str.
+        serverconfig(dict): A dictionary of additional redis-server
+            configuration settings.  All keys and values must be str.
             Supported keys are:
                 activerehashing,
                 aof_rewrite_incremental_fsync,
@@ -514,7 +519,8 @@ class StrictRedis(RedisMixin, redis.StrictRedis):
             not None, the embedded redis server will not be used.  Defaults to
             None.
 
-        serverconfig(dict): A dictionary of additional redis-server configuration settings.  All keys and values must be str.
+        serverconfig(dict): A dictionary of additional redis-server
+            configuration settings.  All keys and values must be str.
             Supported keys are:
                 activerehashing,
                 aof_rewrite_incremental_fsync,

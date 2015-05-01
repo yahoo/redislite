@@ -80,7 +80,9 @@ class TestRedisliteConfiguration(unittest.TestCase):
         self.assertIn('\ndaemonize no', result)
 
         # ensure the global defaults are not modified
-        self.assertEquals(redislite.configuration.default_settings["daemonize"], "yes")
+        self.assertEquals(
+            redislite.configuration.DEFAULT_REDIS_SETTINGS["daemonize"], "yes"
+        )
 
 
     def test_configuration_settings(self):
