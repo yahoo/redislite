@@ -310,6 +310,7 @@ class RedisMixin(object):
 
         logger.debug('Setting up redis with rdb file: %s', self.dbfilename)
         logger.debug('Setting up redis with socket file: %s', self.socket_file)
+        atexit.register(self._cleanup)
         if self._is_redis_running() and not self.socket_file:
             self._load_setting_registry()
             logger.debug(
@@ -324,7 +325,6 @@ class RedisMixin(object):
                     self.dbdir, self.dbfilename + '.settings'
                 )
 
-            atexit.register(self._cleanup)
 
             self._start_redis()
 

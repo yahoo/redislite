@@ -48,10 +48,9 @@ Here is how to patch the redis_collections module to use redislite
 
 .. code-block:: python
 
-    >>> import redislite.patch
-    >>> redislite.patch.patch_redis()
+    >>> import redislite
     >>> import redis_collections
-    >>> td = redis_collections.Dict()
+    >>> td = redis_collections.Dict(redis=redislite.StrictRedis())
     >>> td['foo']='bar'
     >>> td.keys()
     ['foo']
