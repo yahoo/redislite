@@ -42,6 +42,7 @@ Self contained Python interface to the Redis key-value store.
 It makes it possible to use Redis without the need to install and configure
 a redis server.
 
+
 Requirements
 ------------
 The redislite module requires Python 2.7 or higher.

@@ -44,16 +44,20 @@ Note that only one Redis instance is created, and others merely discover the run
 
 redis-collections
 -----------------
-Here is how to patch the redis_collections module to use redislite
+Use a redisliste.StrictRedis() object for the redis-collections redis keyword
+argument to use it with redislite.  If the redis-collection variable needs to
+be persistent make sure to pass the redislite.StrictRedis() class a dbfilename
+argument to use.
 
 .. code-block:: python
 
     >>> import redislite
     >>> import redis_collections
-    >>> td = redis_collections.Dict(redis=redislite.StrictRedis())
-    >>> td['foo']='bar'
-    >>> td.keys()
-    ['foo']
+    >>> example_dict = redis_collections.Dict(redis=redislite.StrictRedis('example.rdb'))
+    >>> example_dict['test'] = 'This is a test variable'
+    >>> example_dict
+    <redis_collections.Dict at 7908fc2cc97d49fda4bce7365df3b373 {'test': 'This is a test variable'}>
+    >>>
 
 
 RQ

@@ -1,4 +1,7 @@
 Troubleshooting redislite
 =========================
 
+Installation Issues
+-------------------
+
 

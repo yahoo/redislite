@@ -24,13 +24,11 @@ import subprocess
 # noinspection PyPep8Naming
 class TestRedisliteSlave(unittest.TestCase):
 
-    def setUp(self):
+    def test_slave(self):
         self.master = redislite.Redis(serverconfig={'port': '7000'})
         self.master.set('key', 'value')
-
-    def test_slave(self):
-        s = redislite.Redis(serverconfig={'slaveof': 'localhost 7000'})
         time.sleep(.5)
+        s = redislite.Redis(serverconfig={'slaveof': 'localhost 7000'})
         value = s.get('key').decode(encoding='UTF-8')
         self.assertEquals(value, 'value')
 
