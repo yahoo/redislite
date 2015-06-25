@@ -52,34 +52,52 @@ from .__init__ import __version__, __git_version__, __source_url__, \
 import os
 
 
+def debug_info_list():
+    """
+    Return a list with the debug information
+    :return:
+    """
+    info = []
+    redis_server = find_executable('redis-server')
+    if __redis_executable__:  # pragma: no cover
+        redis_server = __redis_executable__
+    info.append("Redislite debug information:")
+    info.append('\tVersion: %s' % __version__)
+    info.append('\tModule Path: %s' % os.path.dirname(__file__))
+    info.append('\n\tInstalled Redis Server:')
+    info.append('\t\tRedis Executable: %s' % redis_server)
+    for key, value in __redis_server_info__.items():  # pragma: no cover
+        info.append('\t\t%s = %s' % (key, value))
+    info.append('\n\tFound redis-server: %s' % redis_server)
+    for item in os.popen('%s --version' % redis_server).read().strip().split():
+        if '=' in item:
+            key, value = item.split('=')
+            info.append('\t\t%s = %s' % (key, value))
+    info.append('')
+    info.append('\tSource Code Information')
+    if __git_version__:  # pragma: no cover
+        info.append('\t\tGit Source URL: %s' % __source_url__)
+        info.append('\t\tGit Hash: %s' % __git_hash__)
+        info.append('\t\tGit Version: %s' % __git_version__)
+        info.append('\t\tGit Origin: %s' % __git_origin__)
+        info.append('\t\tGit Branch: %s' % __git_branch__)
+    return info
+
+
+def debug_info():
+    """
+    Return a multi-line string with the debug information
+    :return:
+    """
+    return os.linesep.join(debug_info_list())
+
+
 def print_debug_info():
     """
     Display information about the redislite build, and redis-server on stdout.
     :return:
     """
-    redis_server = find_executable('redis-server')
-    if __redis_executable__:  # pragma: no cover
-        redis_server = __redis_executable__
-    print("Redislite debug information:")
-    print('\tVersion: %s' % __version__)
-    print('\tModule Path: %s' % os.path.dirname(__file__))
-    print('\n\tInstalled Redis Server:')
-    print('\t\tRedis Executable: %s' % redis_server)
-    for key, value in __redis_server_info__.items():  # pragma: no cover
-        print('\t\t%s = %s' % (key, value))
-    print('\n\tFound redis-server: %s' % redis_server)
-    for item in os.popen('%s --version' % redis_server).read().strip().split():
-        if '=' in item:
-            key, value = item.split('=')
-            print('\t\t%s = %s' % (key, value))
-    print('')
-    print('\tSource Code Information')
-    if __git_version__:  # pragma: no cover
-        print('\t\tGit Source URL: %s' % __source_url__)
-        print('\t\tGit Hash: %s' % __git_hash__)
-        print('\t\tGit Version: %s' % __git_version__)
-        print('\t\tGit Origin: %s' % __git_origin__)
-        print('\t\tGit Branch: %s' % __git_branch__)
+    print(debug_info())
 
 
 if __name__ == '__main__':  # pragma: no cover

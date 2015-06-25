@@ -172,6 +172,11 @@ class RedisMixin(object):
         logger.debug('Running: %s', ' '.join(command))
         rc = subprocess.call(command)
         if rc:  # pragma: no cover
+            logger.debug('The binary redis-server failed to start')
+            redis_log = os.path.join(self.redis_dir, 'redis.log')
+            if os.path.exists(redis_log):
+                with open(redis_log) as file_handle:
+                    logger.debug(file_handle.read())
             raise RedisLiteException('The binary redis-server failed to start')
 
         # Wait for Redis to start
