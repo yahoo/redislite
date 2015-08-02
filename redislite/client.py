@@ -325,7 +325,6 @@ class RedisMixin(object):
                     self.dbdir, self.dbfilename + '.settings'
                 )
 
-
             self._start_redis()
 
         kwargs['unix_socket_path'] = self.socket_file
