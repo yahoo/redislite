@@ -103,10 +103,11 @@ class RedisMixin(object):
                 )
                 self.connection_pool.disconnect()
         else:
-            logger.debug(
-                'Redis is not running on socket %s, skipping cleanup',
-                self.socket_file
-            )  # pragma: no cover
+            if self.socket_file:
+                logger.debug(
+                    'Redis is not running on socket %s, skipping cleanup',
+                    self.socket_file
+                )  # pragma: no cover
 
         self.running = False
         self.redis_dir = None
