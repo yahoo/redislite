@@ -133,6 +133,7 @@ args = {
     'author_email': 'dhubbard@yahoo-inc.com',
     'url': 'https://github.com/yahoo/redislite',
     'license': 'BSD',
+    'keywords': 'Redis sqlite',
     'packages': ['redislite'],
     'description': 'Redis built into a python package',
     'install_requires': ['redis', 'psutil', 'jinja2'],
