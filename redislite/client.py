@@ -102,12 +102,6 @@ class RedisMixin(object):
                     self.socket_file
                 )
                 self.connection_pool.disconnect()
-        else:
-            if self.socket_file:
-                logger.debug(
-                    'Redis is not running on socket %s, skipping cleanup',
-                    self.socket_file
-                )  # pragma: no cover
 
         self.running = False
         self.redis_dir = None
@@ -330,7 +324,6 @@ class RedisMixin(object):
                 self.settingregistryfile = os.path.join(
                     self.dbdir, self.dbfilename + '.settings'
                 )
-
 
             self._start_redis()
 
