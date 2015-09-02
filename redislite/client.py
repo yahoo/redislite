@@ -133,6 +133,7 @@ class RedisMixin(object):
                 'Creating temporary redis directory %s', self.redis_dir
             )
             self.pidfile = os.path.join(self.redis_dir, 'redis.pid')
+            self.logfile = os.path.join(self.redis_dir, 'redis.log')
             if not self.socket_file:
                 self.socket_file = os.path.join(self.redis_dir, 'redis.socket')
 
@@ -150,6 +151,7 @@ class RedisMixin(object):
         kwargs.update(
             {
                 'pidfile': self.pidfile,
+                'logfile': kwargs.get('logfile', self.logfile),
                 'unixsocket': self.socket_file,
                 'dbdir': self.dbdir,
                 'dbfilename': self.dbfilename
