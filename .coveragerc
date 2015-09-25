@@ -4,5 +4,5 @@ source = redislite
 cover_pylib = False
 
 [report]
-ignore-errors = True
+ignore_errors = True
 omit = *redis.*
