@@ -116,22 +116,22 @@ class TestRedislitePatch(unittest.TestCase):
         self.assertEqual(r.pid, s.pid)
         redislite.patch.unpatch_redis()
 
-    def test_redislite_patch_redis_with_dbfile(self):
+    def test_redislite_patch_strictredis_with_dbfile(self):
         dbfilename = 'test_redislite_patch_redis_with_short_dbfile.db'
         if os.path.exists(dbfilename):
             os.remove(dbfilename)
-        redislite.patch.patch_redis(dbfilename)
+        redislite.patch.patch_redis_StrictRedis(dbfilename)
         import redis
-        r = redis.Redis()
+        r = redis.StrictRedis()
         self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
-        s = redis.Redis()
+        s = redis.StrictRedis()
         self._log_redis_pid(s)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
 
         # Both instances should be talking to the same redis server
         self.assertEqual(r.pid, s.pid)
-        redislite.patch.unpatch_redis()
+        redislite.patch.unpatch_redis_StrictRedis()
 
 
 if __name__ == '__main__':
