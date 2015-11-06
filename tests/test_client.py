@@ -15,6 +15,7 @@ import shutil
 import stat
 import tempfile
 import unittest
+from redis.exceptions import ConnectionError
 
 
 logger = logging.getLogger(__name__)
@@ -267,6 +268,16 @@ class TestRedisliteClient(unittest.TestCase):
         self._log_redis_pid(r)
         s = redislite.Redis(r.db)
         self.assertEqual(r._connection_count(), 2)
+
+    def test_connection_fallthrough(self):
+        """
+        Create a connection with an argument that will cause redislite
+        to pass it to the redis module.  This should generate an exception
+        since there is no redis server running on the port.
+        :return:
+        """
+        with self.assertRaises(ConnectionError):
+            redislite.Redis(port=1).keys()
 
 
 if __name__ == '__main__':
