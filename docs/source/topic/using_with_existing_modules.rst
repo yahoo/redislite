@@ -89,12 +89,9 @@ Then, create a RQ queue:
     result = q.enqueue(
                  count_words_at_url, 'http://nvie.com')
 
-For a more complete example, refer to the docs. But this is the essence.
-The worker
+For a more complete example, refer to the `RQ docs <http://python-rq.org/>`_. To start executing enqueued function calls in the background, start a worker from your project's directory:
 
-To start executing enqueued function calls in the background, start a worker from your project's directory:
-
-.. code-block::
+.. code-block:: none
 
     $ rqworker
     *** Listening for work on default
