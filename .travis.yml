@@ -1,4 +1,5 @@
 language: python
+sudo: false
 python: 2.7
 env:
   - TOX_ENV=py27
@@ -13,7 +14,6 @@ matrix:
       - TOX_ENV=pypy
       - TOX_ENV=build_docs
 install:
-  - sudo apt-get update -qq
   - pip install --upgrade pip setuptools tox virtualenv coveralls
 script:
   - tox -v -v -e $TOX_ENV
