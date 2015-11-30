@@ -19,3 +19,4 @@ if __name__ == "__main__":
         print(directory)
         tf.extractall(tempdir)
         shutil.move(os.path.join(tempdir, directory), 'redis.submodule')
+	os.system('git add redis.submodule')
