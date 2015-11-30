@@ -63,6 +63,7 @@ struct latencyStats {
 
 void latencyMonitorInit(void);
 void latencyAddSample(char *event, mstime_t latency);
+int THPIsEnabled(void);
 
 /* Latency monitoring macros. */
 
@@ -84,5 +85,9 @@ void latencyAddSample(char *event, mstime_t latency);
     if (server.latency_monitor_threshold && \
         (var) >= server.latency_monitor_threshold) \
           latencyAddSample((event),(var));
+
+/* Remove time from a nested event. */
+#define latencyRemoveNestedEvent(event_var,nested_var) \
+    event_var += nested_var;
 
 #endif /* __LATENCY_H */
