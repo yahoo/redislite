@@ -37,13 +37,12 @@ A good bug report shouldn't leave others needing to chase you up for more inform
 Try and include the following information:
 
 * What is your environment?
+* If the redislite package is installed, run "python -m redislite.debug" and paste the output into the issue.
 * What steps will reproduce the issue?
 * What were you expecting to happen?
 * If the redislite python module installed, include the output of the debug module, which can be obtained by running:
-
-
     python -m redislite.debug
-
+    
 # Contributing to RedisLite
 
 See the [Contributing Section of the documentation](http://redislite.readthedocs.org/en/latest/topic/contributing.html) for details of how to contribute to Redislite.
