@@ -194,6 +194,7 @@ void sortCommand(redisClient *c) {
     int j, dontsort = 0, vectorlen;
     int getop = 0; /* GET operation counter */
     int int_convertion_error = 0;
+    int syntax_error = 0;
     robj *sortval, *sortby = NULL, *storekey = NULL;
     redisSortObject *vector; /* Resulting vector to sort */
 
@@ -208,7 +209,7 @@ void sortCommand(redisClient *c) {
     }
 
     /* Create a list of operations to perform for every sorted element.
-     * Operations can be GET/DEL/INCR/DECR */
+     * Operations can be GET */
     operations = listCreate();
     listSetFreeMethod(operations,zfree);
     j = 2; /* options start at argv[2] */
@@ -236,9 +237,8 @@ void sortCommand(redisClient *c) {
                 (getLongFromObjectOrReply(c, c->argv[j+2], &limit_count, NULL)
                  != REDIS_OK))
             {
-                decrRefCount(sortval);
-                listRelease(operations);
-                return;
+                syntax_error++;
+                break;
             }
             j+=2;
         } else if (!strcasecmp(c->argv[j]->ptr,"store") && leftargs >= 1) {
@@ -248,32 +248,52 @@ void sortCommand(redisClient *c) {
             sortby = c->argv[j+1];
             /* If the BY pattern does not contain '*', i.e. it is constant,
              * we don't need to sort nor to lookup the weight keys. */
-            if (strchr(c->argv[j+1]->ptr,'*') == NULL) dontsort = 1;
+            if (strchr(c->argv[j+1]->ptr,'*') == NULL) {
+                dontsort = 1;
+            } else {
+                /* If BY is specified with a real patter, we can't accept
+                 * it in cluster mode. */
+                if (server.cluster_enabled) {
+                    addReplyError(c,"BY option of SORT denied in Cluster mode.");
+                    syntax_error++;
+                    break;
+                }
+            }
             j++;
         } else if (!strcasecmp(c->argv[j]->ptr,"get") && leftargs >= 1) {
+            if (server.cluster_enabled) {
+                addReplyError(c,"GET option of SORT denied in Cluster mode.");
+                syntax_error++;
+                break;
+            }
             listAddNodeTail(operations,createSortOperation(
                 REDIS_SORT_GET,c->argv[j+1]));
             getop++;
             j++;
         } else {
-            decrRefCount(sortval);
-            listRelease(operations);
             addReply(c,shared.syntaxerr);
-            return;
+            syntax_error++;
+            break;
         }
         j++;
     }
 
-    /* For the STORE option, or when SORT is called from a Lua script,
-     * we want to force a specific ordering even when no explicit ordering
-     * was asked (SORT BY nosort). This guarantees that replication / AOF
-     * is deterministic.
+    /* Handle syntax errors set during options parsing. */
+    if (syntax_error) {
+        decrRefCount(sortval);
+        listRelease(operations);
+        return;
+    }
+
+    /* When sorting a set with no sort specified, we must sort the output
+     * so the result is consistent across scripting and replication.
      *
-     * However in the case 'dontsort' is true, but the type to sort is a
-     * sorted set, we don't need to do anything as ordering is guaranteed
-     * in this special case. */
-    if ((storekey || c->flags & REDIS_LUA_CLIENT) &&
-        (dontsort && sortval->type != REDIS_ZSET))
+     * The other types (list, sorted set) will retain their native order
+     * even if no sort order is requested, so they remain stable across
+     * scripting and replication. */
+    if (dontsort &&
+        sortval->type == REDIS_SET &&
+        (storekey || c->flags & REDIS_LUA_CLIENT))
     {
         /* Force ALPHA sorting */
         dontsort = 0;
@@ -418,7 +438,7 @@ void sortCommand(redisClient *c) {
             if (alpha) {
                 if (sortby) vector[j].u.cmpobj = getDecodedObject(byval);
             } else {
-                if (byval->encoding == REDIS_ENCODING_RAW) {
+                if (sdsEncodedObject(byval)) {
                     char *eptr;
 
                     vector[j].u.score = strtod(byval->ptr,&eptr);

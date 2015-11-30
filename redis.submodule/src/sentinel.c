@@ -397,6 +397,7 @@ struct redisCommand sentinelcmds[] = {
     {"publish",sentinelPublishCommand,3,"",0,NULL,0,0,0,0,0},
     {"info",sentinelInfoCommand,-1,"",0,NULL,0,0,0,0,0},
     {"role",sentinelRoleCommand,1,"l",0,NULL,0,0,0,0,0},
+    {"client",clientCommand,-2,"rs",0,NULL,0,0,0,0,0},
     {"shutdown",shutdownCommand,-1,"",0,NULL,0,0,0,0,0}
 };
 
@@ -922,6 +923,7 @@ sentinelRedisInstance *createSentinelRedisInstance(char *name, int flags, char *
     else if (flags & SRI_SENTINEL) table = master->sentinels;
     sdsname = sdsnew(name);
     if (dictFind(table,sdsname)) {
+        releaseSentinelAddr(addr);
         sdsfree(sdsname);
         errno = EBUSY;
         return NULL;
@@ -1155,7 +1157,9 @@ void sentinelDelFlagsToDictOfRedisInstances(dict *instances, int flags) {
  * 1) Remove all slaves.
  * 2) Remove all sentinels.
  * 3) Remove most of the flags resulting from runtime operations.
- * 4) Reset timers to their default value.
+ * 4) Reset timers to their default value. For example after a reset it will be
+ *    possible to failover again the same master ASAP, without waiting the
+ *    failover timeout delay.
  * 5) In the process of doing this undo the failover if in progress.
  * 6) Disconnect the connections with the master (will reconnect automatically).
  */
@@ -1178,7 +1182,7 @@ void sentinelResetMaster(sentinelRedisInstance *ri, int flags) {
     }
     ri->failover_state = SENTINEL_FAILOVER_STATE_NONE;
     ri->failover_state_change_time = 0;
-    ri->failover_start_time = 0;
+    ri->failover_start_time = 0; /* We can failover again ASAP. */
     ri->promoted_slave = NULL;
     sdsfree(ri->runid);
     sdsfree(ri->slave_master_host);
@@ -1268,10 +1272,7 @@ int sentinelResetMasterAndChangeAddress(sentinelRedisInstance *master, char *ip,
         slave = createSentinelRedisInstance(NULL,SRI_SLAVE,slaves[j]->ip,
                     slaves[j]->port, master->quorum, master);
         releaseSentinelAddr(slaves[j]);
-        if (slave) {
-            sentinelEvent(REDIS_NOTICE,"+slave",slave,"%@");
-            sentinelFlushConfig();
-        }
+        if (slave) sentinelEvent(REDIS_NOTICE,"+slave",slave,"%@");
     }
     zfree(slaves);
 
@@ -1545,7 +1546,7 @@ void rewriteConfigSentinelOption(struct rewriteConfigState *state) {
                 slave_addr = master->addr;
             line = sdscatprintf(sdsempty(),
                 "sentinel known-slave %s %s %d",
-                master->name, ri->addr->ip, ri->addr->port);
+                master->name, slave_addr->ip, slave_addr->port);
             rewriteConfigRewriteLine(state,"sentinel",line,1);
         }
         dictReleaseIterator(di2);
@@ -1843,6 +1844,7 @@ void sentinelRefreshInstanceInfo(sentinelRedisInstance *ri, const char *info) {
                             atoi(port), ri->quorum, ri)) != NULL)
                 {
                     sentinelEvent(REDIS_NOTICE,"+slave",slave,"%@");
+                    sentinelFlushConfig();
                 }
             }
         }
@@ -2106,7 +2108,7 @@ void sentinelPublishReplyCallback(redisAsyncContext *c, void *reply, void *privd
  * or sent directly to this sentinel via the (fake) PUBLISH command of Sentinel.
  *
  * If the master name specified in the message is not known, the message is
- * discareded. */
+ * discarded. */
 void sentinelProcessHelloMessage(char *hello, int hello_len) {
     /* Format is composed of 8 tokens:
      * 0=ip,1=port,2=runid,3=current_epoch,4=master_name,
@@ -2614,6 +2616,31 @@ sentinelRedisInstance *sentinelGetMasterByNameOrReplyError(redisClient *c,
     return ri;
 }
 
+#define SENTINEL_ISQR_OK 0
+#define SENTINEL_ISQR_NOQUORUM (1<<0)
+#define SENTINEL_ISQR_NOAUTH (1<<1)
+int sentinelIsQuorumReachable(sentinelRedisInstance *master, int *usableptr) {
+    dictIterator *di;
+    dictEntry *de;
+    int usable = 1; /* Number of usable Sentinels. Init to 1 to count myself. */
+    int result = SENTINEL_ISQR_OK;
+    int voters = dictSize(master->sentinels)+1; /* Known Sentinels + myself. */
+
+    di = dictGetIterator(master->sentinels);
+    while((de = dictNext(di)) != NULL) {
+        sentinelRedisInstance *ri = dictGetVal(de);
+
+        if (ri->flags & (SRI_S_DOWN|SRI_O_DOWN)) continue;
+        usable++;
+    }
+    dictReleaseIterator(di);
+
+    if (usable < (int)master->quorum) result |= SENTINEL_ISQR_NOQUORUM;
+    if (usable < voters/2+1) result |= SENTINEL_ISQR_NOAUTH;
+    if (usableptr) *usableptr = usable;
+    return result;
+}
+
 void sentinelCommand(redisClient *c) {
     if (!strcasecmp(c->argv[1]->ptr,"masters")) {
         /* SENTINEL MASTERS */
@@ -2764,16 +2791,49 @@ void sentinelCommand(redisClient *c) {
             sentinelEvent(REDIS_WARNING,"+monitor",ri,"%@ quorum %d",ri->quorum);
             addReply(c,shared.ok);
         }
+    } else if (!strcasecmp(c->argv[1]->ptr,"flushconfig")) {
+        if (c->argc != 2) goto numargserr;
+        sentinelFlushConfig();
+        addReply(c,shared.ok);
+        return;
     } else if (!strcasecmp(c->argv[1]->ptr,"remove")) {
         /* SENTINEL REMOVE <name> */
         sentinelRedisInstance *ri;
 
+        if (c->argc != 3) goto numargserr;
         if ((ri = sentinelGetMasterByNameOrReplyError(c,c->argv[2]))
             == NULL) return;
         sentinelEvent(REDIS_WARNING,"-monitor",ri,"%@");
         dictDelete(sentinel.masters,c->argv[2]->ptr);
         sentinelFlushConfig();
         addReply(c,shared.ok);
+    } else if (!strcasecmp(c->argv[1]->ptr,"ckquorum")) {
+        /* SENTINEL CKQUORUM <name> */
+        sentinelRedisInstance *ri;
+        int usable;
+
+        if (c->argc != 3) goto numargserr;
+        if ((ri = sentinelGetMasterByNameOrReplyError(c,c->argv[2]))
+            == NULL) return;
+        int result = sentinelIsQuorumReachable(ri,&usable);
+        if (result == SENTINEL_ISQR_OK) {
+            addReplySds(c, sdscatfmt(sdsempty(),
+                "+OK %i usable Sentinels. Quorum and failover authorization "
+                "can be reached\r\n",usable));
+        } else {
+            sds e = sdscatfmt(sdsempty(),
+                "-NOQUORUM %i usable Sentinels. ",usable);
+            if (result & SENTINEL_ISQR_NOQUORUM)
+                e = sdscat(e,"Not enough available Sentinels to reach the"
+                             " specified quorum for this master");
+            if (result & SENTINEL_ISQR_NOAUTH) {
+                if (result & SENTINEL_ISQR_NOQUORUM) e = sdscat(e,". ");
+                e = sdscat(e, "Not enough available Sentinels to reach the"
+                              " majority and authorize a failover");
+            }
+            e = sdscat(e,"\r\n");
+            addReplySds(c,e);
+        }
     } else if (!strcasecmp(c->argv[1]->ptr,"set")) {
         if (c->argc < 3 || c->argc % 2 == 0) goto numargserr;
         sentinelSetCommand(c);

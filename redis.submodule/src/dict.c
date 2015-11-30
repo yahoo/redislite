@@ -211,6 +211,9 @@ int dictExpand(dict *d, unsigned long size)
     if (dictIsRehashing(d) || d->ht[0].used > size)
         return DICT_ERR;
 
+    /* Rehashing to the same table size is not useful. */
+    if (realsize == d->ht[0].size) return DICT_ERR;
+
     /* Allocate the new hash table and initialize all pointers to NULL */
     n.size = realsize;
     n.sizemask = realsize-1;
@@ -232,27 +235,27 @@ int dictExpand(dict *d, unsigned long size)
 
 /* Performs N steps of incremental rehashing. Returns 1 if there are still
  * keys to move from the old to the new hash table, otherwise 0 is returned.
+ *
  * Note that a rehashing step consists in moving a bucket (that may have more
- * than one key as we use chaining) from the old to the new hash table. */
+ * than one key as we use chaining) from the old to the new hash table, however
+ * since part of the hash table may be composed of empty spaces, it is not
+ * guaranteed that this function will rehash even a single bucket, since it
+ * will visit at max N*10 empty buckets in total, otherwise the amount of
+ * work it does would be unbound and the function may block for a long time. */
 int dictRehash(dict *d, int n) {
+    int empty_visits = n*10; /* Max number of empty buckets to visit. */
     if (!dictIsRehashing(d)) return 0;
 
-    while(n--) {
+    while(n-- && d->ht[0].used != 0) {
         dictEntry *de, *nextde;
-
-        /* Check if we already rehashed the whole table... */
-        if (d->ht[0].used == 0) {
-            zfree(d->ht[0].table);
-            d->ht[0] = d->ht[1];
-            _dictReset(&d->ht[1]);
-            d->rehashidx = -1;
-            return 0;
-        }
 
         /* Note that rehashidx can't overflow as we are sure there are more
          * elements because ht[0].used != 0 */
         assert(d->ht[0].size > (unsigned long)d->rehashidx);
-        while(d->ht[0].table[d->rehashidx] == NULL) d->rehashidx++;
+        while(d->ht[0].table[d->rehashidx] == NULL) {
+            d->rehashidx++;
+            if (--empty_visits == 0) return 1;
+        }
         de = d->ht[0].table[d->rehashidx];
         /* Move all the keys in this bucket from the old to the new hash HT */
         while(de) {
@@ -270,6 +273,17 @@ int dictRehash(dict *d, int n) {
         d->ht[0].table[d->rehashidx] = NULL;
         d->rehashidx++;
     }
+
+    /* Check if we already rehashed the whole table... */
+    if (d->ht[0].used == 0) {
+        zfree(d->ht[0].table);
+        d->ht[0] = d->ht[1];
+        _dictReset(&d->ht[1]);
+        d->rehashidx = -1;
+        return 0;
+    }
+
+    /* More to rehash... */
     return 1;
 }
 
@@ -318,7 +332,7 @@ int dictAdd(dict *d, void *key, void *val)
  * a value returns the dictEntry structure to the user, that will make
  * sure to fill the value field as he wishes.
  *
- * This function is also directly exposed to user API to be called
+ * This function is also directly exposed to the user API to be called
  * mainly in order to store non-pointers inside the hash value, example:
  *
  * entry = dictAddRaw(dict,mykey);
@@ -616,7 +630,11 @@ dictEntry *dictGetRandomKey(dict *d)
     if (dictIsRehashing(d)) _dictRehashStep(d);
     if (dictIsRehashing(d)) {
         do {
-            h = random() % (d->ht[0].size+d->ht[1].size);
+            /* We are sure there are no elements in indexes from 0
+             * to rehashidx-1 */
+            h = d->rehashidx + (random() % (d->ht[0].size +
+                                            d->ht[1].size -
+                                            d->rehashidx));
             he = (h >= d->ht[0].size) ? d->ht[1].table[h - d->ht[0].size] :
                                       d->ht[0].table[h];
         } while(he == NULL);
@@ -643,6 +661,95 @@ dictEntry *dictGetRandomKey(dict *d)
     return he;
 }
 
+/* This function samples the dictionary to return a few keys from random
+ * locations.
+ *
+ * It does not guarantee to return all the keys specified in 'count', nor
+ * it does guarantee to return non-duplicated elements, however it will make
+ * some effort to do both things.
+ *
+ * Returned pointers to hash table entries are stored into 'des' that
+ * points to an array of dictEntry pointers. The array must have room for
+ * at least 'count' elements, that is the argument we pass to the function
+ * to tell how many random elements we need.
+ *
+ * The function returns the number of items stored into 'des', that may
+ * be less than 'count' if the hash table has less than 'count' elements
+ * inside, or if not enough elements were found in a reasonable amount of
+ * steps.
+ *
+ * Note that this function is not suitable when you need a good distribution
+ * of the returned items, but only when you need to "sample" a given number
+ * of continuous elements to run some kind of algorithm or to produce
+ * statistics. However the function is much faster than dictGetRandomKey()
+ * at producing N elements. */
+unsigned int dictGetSomeKeys(dict *d, dictEntry **des, unsigned int count) {
+    unsigned int j; /* internal hash table id, 0 or 1. */
+    unsigned int tables; /* 1 or 2 tables? */
+    unsigned int stored = 0, maxsizemask;
+    unsigned int maxsteps;
+
+    if (dictSize(d) < count) count = dictSize(d);
+    maxsteps = count*10;
+
+    /* Try to do a rehashing work proportional to 'count'. */
+    for (j = 0; j < count; j++) {
+        if (dictIsRehashing(d))
+            _dictRehashStep(d);
+        else
+            break;
+    }
+
+    tables = dictIsRehashing(d) ? 2 : 1;
+    maxsizemask = d->ht[0].sizemask;
+    if (tables > 1 && maxsizemask < d->ht[1].sizemask)
+        maxsizemask = d->ht[1].sizemask;
+
+    /* Pick a random point inside the larger table. */
+    unsigned int i = random() & maxsizemask;
+    unsigned int emptylen = 0; /* Continuous empty entries so far. */
+    while(stored < count && maxsteps--) {
+        for (j = 0; j < tables; j++) {
+            /* Invariant of the dict.c rehashing: up to the indexes already
+             * visited in ht[0] during the rehashing, there are no populated
+             * buckets, so we can skip ht[0] for indexes between 0 and idx-1. */
+            if (tables == 2 && j == 0 && i < (unsigned int) d->rehashidx) {
+                /* Moreover, if we are currently out of range in the second
+                 * table, there will be no elements in both tables up to
+                 * the current rehashing index, so we jump if possible.
+                 * (this happens when going from big to small table). */
+                if (i >= d->ht[1].size) i = d->rehashidx;
+                continue;
+            }
+            if (i >= d->ht[j].size) continue; /* Out of range for this table. */
+            dictEntry *he = d->ht[j].table[i];
+
+            /* Count contiguous empty buckets, and jump to other
+             * locations if they reach 'count' (with a minimum of 5). */
+            if (he == NULL) {
+                emptylen++;
+                if (emptylen >= 5 && emptylen > count) {
+                    i = random() & maxsizemask;
+                    emptylen = 0;
+                }
+            } else {
+                emptylen = 0;
+                while (he) {
+                    /* Collect all the elements of the buckets found non
+                     * empty while iterating. */
+                    *des = he;
+                    des++;
+                    he = he->next;
+                    stored++;
+                    if (stored == count) return stored;
+                }
+            }
+        }
+        i = (i+1) & maxsizemask;
+    }
+    return stored;
+}
+
 /* Function to reverse bits. Algorithm from:
  * http://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel */
 static unsigned long rev(unsigned long v) {
@@ -657,72 +764,72 @@ static unsigned long rev(unsigned long v) {
 
 /* dictScan() is used to iterate over the elements of a dictionary.
  *
- * Iterating works in the following way:
+ * Iterating works the following way:
  *
  * 1) Initially you call the function using a cursor (v) value of 0.
  * 2) The function performs one step of the iteration, and returns the
- *    new cursor value that you must use in the next call.
+ *    new cursor value you must use in the next call.
  * 3) When the returned cursor is 0, the iteration is complete.
  *
- * The function guarantees that all the elements that are present in the
- * dictionary from the start to the end of the iteration are returned.
- * However it is possible that some element is returned multiple time.
+ * The function guarantees all elements present in the
+ * dictionary get returned between the start and end of the iteration.
+ * However it is possible some elements get returned multiple times.
  *
- * For every element returned, the callback 'fn' passed as argument is
- * called, with 'privdata' as first argument and the dictionar entry
+ * For every element returned, the callback argument 'fn' is
+ * called with 'privdata' as first argument and the dictionary entry
  * 'de' as second argument.
  *
  * HOW IT WORKS.
  *
- * The algorithm used in the iteration was designed by Pieter Noordhuis.
+ * The iteration algorithm was designed by Pieter Noordhuis.
  * The main idea is to increment a cursor starting from the higher order
- * bits, that is, instead of incrementing the cursor normally, the bits
+ * bits. That is, instead of incrementing the cursor normally, the bits
  * of the cursor are reversed, then the cursor is incremented, and finally
  * the bits are reversed again.
  *
- * This strategy is needed because the hash table may be resized from one
- * call to the other call of the same iteration.
+ * This strategy is needed because the hash table may be resized between
+ * iteration calls.
  *
  * dict.c hash tables are always power of two in size, and they
  * use chaining, so the position of an element in a given table is given
- * always by computing the bitwise AND between Hash(key) and SIZE-1
+ * by computing the bitwise AND between Hash(key) and SIZE-1
  * (where SIZE-1 is always the mask that is equivalent to taking the rest
  *  of the division between the Hash of the key and SIZE).
  *
  * For example if the current hash table size is 16, the mask is
- * (in binary) 1111. The position of a key in the hash table will be always
+ * (in binary) 1111. The position of a key in the hash table will always be
  * the last four bits of the hash output, and so forth.
  *
  * WHAT HAPPENS IF THE TABLE CHANGES IN SIZE?
  *
- * If the hash table grows, elements can go anyway in one multiple of
- * the old bucket: for example let's say that we already iterated with
- * a 4 bit cursor 1100, since the mask is 1111 (hash table size = 16).
+ * If the hash table grows, elements can go anywhere in one multiple of
+ * the old bucket: for example let's say we already iterated with
+ * a 4 bit cursor 1100 (the mask is 1111 because hash table size = 16).
  *
- * If the hash table will be resized to 64 elements, and the new mask will
- * be 111111, the new buckets that you obtain substituting in ??1100
- * either 0 or 1, can be targeted only by keys that we already visited
+ * If the hash table will be resized to 64 elements, then the new mask will
+ * be 111111. The new buckets you obtain by substituting in ??1100
+ * with either 0 or 1 can be targeted only by keys we already visited
  * when scanning the bucket 1100 in the smaller hash table.
  *
  * By iterating the higher bits first, because of the inverted counter, the
- * cursor does not need to restart if the table size gets bigger, and will
- * just continue iterating with cursors that don't have '1100' at the end,
- * nor any other combination of final 4 bits already explored.
+ * cursor does not need to restart if the table size gets bigger. It will
+ * continue iterating using cursors without '1100' at the end, and also
+ * without any other combination of the final 4 bits already explored.
  *
  * Similarly when the table size shrinks over time, for example going from
- * 16 to 8, If a combination of the lower three bits (the mask for size 8
- * is 111) was already completely explored, it will not be visited again
- * as we are sure that, we tried for example, both 0111 and 1111 (all the
+ * 16 to 8, if a combination of the lower three bits (the mask for size 8
+ * is 111) were already completely explored, it would not be visited again
+ * because we are sure we tried, for example, both 0111 and 1111 (all the
  * variations of the higher bit) so we don't need to test it again.
  *
  * WAIT... YOU HAVE *TWO* TABLES DURING REHASHING!
  *
- * Yes, this is true, but we always iterate the smaller one of the tables,
- * testing also all the expansions of the current cursor into the larger
- * table. So for example if the current cursor is 101 and we also have a
+ * Yes, this is true, but we always iterate the smaller table first, then
+ * we test all the expansions of the current cursor into the larger
+ * table. For example if the current cursor is 101 and we also have a
  * larger table of size 16, we also test (0)101 and (1)101 inside the larger
  * table. This reduces the problem back to having only one table, where
- * the larger one, if exists, is just an expansion of the smaller one.
+ * the larger one, if it exists, is just an expansion of the smaller one.
  *
  * LIMITATIONS
  *
@@ -731,11 +838,11 @@ static unsigned long rev(unsigned long v) {
  *
  * The disadvantages resulting from this design are:
  *
- * 1) It is possible that we return duplicated elements. However this is usually
+ * 1) It is possible we return elements more than once. However this is usually
  *    easy to deal with in the application level.
  * 2) The iterator must return multiple elements per call, as it needs to always
  *    return all the keys chained in a given bucket, and all the expansions, so
- *    we are sure we don't miss keys moving.
+ *    we are sure we don't miss keys moving during rehashing.
  * 3) The reverse cursor is somewhat hard to understand at first, but this
  *    comment is supposed to help.
  */

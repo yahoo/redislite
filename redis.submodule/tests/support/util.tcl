@@ -262,46 +262,50 @@ proc formatCommand {args} {
 
 proc csvdump r {
     set o {}
-    foreach k [lsort [{*}$r keys *]] {
-        set type [{*}$r type $k]
-        append o [csvstring $k] , [csvstring $type] ,
-        switch $type {
-            string {
-                append o [csvstring [{*}$r get $k]] "\n"
-            }
-            list {
-                foreach e [{*}$r lrange $k 0 -1] {
-                    append o [csvstring $e] ,
+    for {set db 0} {$db < 16} {incr db} {
+        {*}$r select $db
+        foreach k [lsort [{*}$r keys *]] {
+            set type [{*}$r type $k]
+            append o [csvstring $db] , [csvstring $k] , [csvstring $type] ,
+            switch $type {
+                string {
+                    append o [csvstring [{*}$r get $k]] "\n"
                 }
-                append o "\n"
-            }
-            set {
-                foreach e [lsort [{*}$r smembers $k]] {
-                    append o [csvstring $e] ,
+                list {
+                    foreach e [{*}$r lrange $k 0 -1] {
+                        append o [csvstring $e] ,
+                    }
+                    append o "\n"
                 }
-                append o "\n"
-            }
-            zset {
-                foreach e [{*}$r zrange $k 0 -1 withscores] {
-                    append o [csvstring $e] ,
+                set {
+                    foreach e [lsort [{*}$r smembers $k]] {
+                        append o [csvstring $e] ,
+                    }
+                    append o "\n"
                 }
-                append o "\n"
-            }
-            hash {
-                set fields [{*}$r hgetall $k]
-                set newfields {}
-                foreach {k v} $fields {
-                    lappend newfields [list $k $v]
+                zset {
+                    foreach e [{*}$r zrange $k 0 -1 withscores] {
+                        append o [csvstring $e] ,
+                    }
+                    append o "\n"
                 }
-                set fields [lsort -index 0 $newfields]
-                foreach kv $fields {
-                    append o [csvstring [lindex $kv 0]] ,
-                    append o [csvstring [lindex $kv 1]] ,
+                hash {
+                    set fields [{*}$r hgetall $k]
+                    set newfields {}
+                    foreach {k v} $fields {
+                        lappend newfields [list $k $v]
+                    }
+                    set fields [lsort -index 0 $newfields]
+                    foreach kv $fields {
+                        append o [csvstring [lindex $kv 0]] ,
+                        append o [csvstring [lindex $kv 1]] ,
+                    }
+                    append o "\n"
                 }
-                append o "\n"
             }
         }
     }
+    {*}$r select 9
     return $o
 }
 
@@ -315,12 +319,14 @@ proc roundFloat f {
 
 proc find_available_port start {
     for {set j $start} {$j < $start+1024} {incr j} {
-        if {[catch {
-            set fd [socket 127.0.0.1 $j]
-        }]} {
+        if {[catch {set fd1 [socket 127.0.0.1 $j]}] &&
+            [catch {set fd2 [socket 127.0.0.1 [expr $j+10000]]}]} {
             return $j
         } else {
-            close $fd
+            catch {
+                close $fd1
+                close $fd2
+            }
         }
     }
     if {$j == $start+1024} {

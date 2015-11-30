@@ -43,7 +43,7 @@ void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
     if (o->encoding != REDIS_ENCODING_ZIPLIST) return;
 
     for (i = start; i <= end; i++) {
-        if (argv[i]->encoding == REDIS_ENCODING_RAW &&
+        if (sdsEncodedObject(argv[i]) &&
             sdslen(argv[i]->ptr) > server.hash_max_ziplist_value)
         {
             hashTypeConvert(o, REDIS_ENCODING_HT);
@@ -384,15 +384,12 @@ robj *hashTypeCurrentObject(hashTypeIterator *hi, int what) {
         } else {
             dst = createStringObjectFromLongLong(vll);
         }
-
     } else if (hi->encoding == REDIS_ENCODING_HT) {
         hashTypeCurrentFromHashTable(hi, what, &dst);
         incrRefCount(dst);
-
     } else {
         redisPanic("Unknown hash encoding");
     }
-
     return dst;
 }
 
@@ -568,7 +565,7 @@ void hincrbyfloatCommand(redisClient *c) {
     }
 
     value += incr;
-    new = createStringObjectFromLongDouble(value);
+    new = createStringObjectFromLongDouble(value,1);
     hashTypeTryObjectEncoding(o,&c->argv[2],NULL);
     hashTypeSet(o,c->argv[2],new);
     addReplyBulk(c,new);

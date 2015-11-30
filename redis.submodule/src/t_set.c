@@ -321,7 +321,7 @@ void smoveCommand(redisClient *c) {
 
     /* If srcset and dstset are equal, SMOVE is a no-op */
     if (srcset == dstset) {
-        addReply(c,shared.cone);
+        addReply(c,setTypeIsMember(srcset,ele) ? shared.cone : shared.czero);
         return;
     }
 
@@ -495,11 +495,8 @@ void srandmemberWithCountCommand(redisClient *c) {
 
             if (encoding == REDIS_ENCODING_INTSET) {
                 retval = dictAdd(d,createStringObjectFromLongLong(llele),NULL);
-            } else if (ele->encoding == REDIS_ENCODING_RAW) {
+            } else {
                 retval = dictAdd(d,dupStringObject(ele),NULL);
-            } else if (ele->encoding == REDIS_ENCODING_INT) {
-                retval = dictAdd(d,
-                    createStringObjectFromLongLong((long)ele->ptr),NULL);
             }
             redisAssert(retval == DICT_OK);
         }
@@ -527,10 +524,8 @@ void srandmemberWithCountCommand(redisClient *c) {
             encoding = setTypeRandomElement(set,&ele,&llele);
             if (encoding == REDIS_ENCODING_INTSET) {
                 ele = createStringObjectFromLongLong(llele);
-            } else if (ele->encoding == REDIS_ENCODING_RAW) {
+            } else {
                 ele = dupStringObject(ele);
-            } else if (ele->encoding == REDIS_ENCODING_INT) {
-                ele = createStringObjectFromLongLong((long)ele->ptr);
             }
             /* Try to add the object to the dictionary. If it already exists
              * free it, otherwise increment the number of objects we have

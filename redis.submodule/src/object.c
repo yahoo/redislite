@@ -44,12 +44,52 @@ robj *createObject(int type, void *ptr) {
     o->refcount = 1;
 
     /* Set the LRU to the current lruclock (minutes resolution). */
-    o->lru = server.lruclock;
+    o->lru = LRU_CLOCK();
     return o;
 }
 
-robj *createStringObject(char *ptr, size_t len) {
+/* Create a string object with encoding REDIS_ENCODING_RAW, that is a plain
+ * string object where o->ptr points to a proper sds string. */
+robj *createRawStringObject(char *ptr, size_t len) {
     return createObject(REDIS_STRING,sdsnewlen(ptr,len));
+}
+
+/* Create a string object with encoding REDIS_ENCODING_EMBSTR, that is
+ * an object where the sds string is actually an unmodifiable string
+ * allocated in the same chunk as the object itself. */
+robj *createEmbeddedStringObject(char *ptr, size_t len) {
+    robj *o = zmalloc(sizeof(robj)+sizeof(struct sdshdr)+len+1);
+    struct sdshdr *sh = (void*)(o+1);
+
+    o->type = REDIS_STRING;
+    o->encoding = REDIS_ENCODING_EMBSTR;
+    o->ptr = sh+1;
+    o->refcount = 1;
+    o->lru = LRU_CLOCK();
+
+    sh->len = len;
+    sh->free = 0;
+    if (ptr) {
+        memcpy(sh->buf,ptr,len);
+        sh->buf[len] = '\0';
+    } else {
+        memset(sh->buf,0,len+1);
+    }
+    return o;
+}
+
+/* Create a string object with EMBSTR encoding if it is smaller than
+ * REIDS_ENCODING_EMBSTR_SIZE_LIMIT, otherwise the RAW encoding is
+ * used.
+ *
+ * The current limit of 39 is chosen so that the biggest string object
+ * we allocate as EMBSTR will still fit into the 64 byte arena of jemalloc. */
+#define REDIS_ENCODING_EMBSTR_SIZE_LIMIT 39
+robj *createStringObject(char *ptr, size_t len) {
+    if (len <= REDIS_ENCODING_EMBSTR_SIZE_LIMIT)
+        return createEmbeddedStringObject(ptr,len);
+    else
+        return createRawStringObject(ptr,len);
 }
 
 robj *createStringObjectFromLongLong(long long value) {
@@ -69,33 +109,75 @@ robj *createStringObjectFromLongLong(long long value) {
     return o;
 }
 
-/* Note: this function is defined into object.c since here it is where it
- * belongs but it is actually designed to be used just for INCRBYFLOAT */
-robj *createStringObjectFromLongDouble(long double value) {
+/* Create a string object from a long double. If humanfriendly is non-zero
+ * it does not use exponential format and trims trailing zeroes at the end,
+ * however this results in loss of precision. Otherwise exp format is used
+ * and the output of snprintf() is not modified.
+ *
+ * The 'humanfriendly' option is used for INCRBYFLOAT and HINCRBYFLOAT. */
+robj *createStringObjectFromLongDouble(long double value, int humanfriendly) {
     char buf[256];
     int len;
 
-    /* We use 17 digits precision since with 128 bit floats that precision
-     * after rounding is able to represent most small decimal numbers in a way
-     * that is "non surprising" for the user (that is, most small decimal
-     * numbers will be represented in a way that when converted back into
-     * a string are exactly the same as what the user typed.) */
-    len = snprintf(buf,sizeof(buf),"%.17Lf", value);
-    /* Now remove trailing zeroes after the '.' */
-    if (strchr(buf,'.') != NULL) {
-        char *p = buf+len-1;
-        while(*p == '0') {
-            p--;
-            len--;
+    if (isinf(value)) {
+        /* Libc in odd systems (Hi Solaris!) will format infinite in a
+         * different way, so better to handle it in an explicit way. */
+        if (value > 0) {
+            memcpy(buf,"inf",3);
+            len = 3;
+        } else {
+            memcpy(buf,"-inf",4);
+            len = 4;
         }
-        if (*p == '.') len--;
+    } else if (humanfriendly) {
+        /* We use 17 digits precision since with 128 bit floats that precision
+         * after rounding is able to represent most small decimal numbers in a
+         * way that is "non surprising" for the user (that is, most small
+         * decimal numbers will be represented in a way that when converted
+         * back into a string are exactly the same as what the user typed.) */
+        len = snprintf(buf,sizeof(buf),"%.17Lf", value);
+        /* Now remove trailing zeroes after the '.' */
+        if (strchr(buf,'.') != NULL) {
+            char *p = buf+len-1;
+            while(*p == '0') {
+                p--;
+                len--;
+            }
+            if (*p == '.') len--;
+        }
+    } else {
+        len = snprintf(buf,sizeof(buf),"%.17Lg", value);
     }
     return createStringObject(buf,len);
 }
 
+/* Duplicate a string object, with the guarantee that the returned object
+ * has the same encoding as the original one.
+ *
+ * This function also guarantees that duplicating a small integere object
+ * (or a string object that contains a representation of a small integer)
+ * will always result in a fresh object that is unshared (refcount == 1).
+ *
+ * The resulting object always has refcount set to 1. */
 robj *dupStringObject(robj *o) {
-    redisAssertWithInfo(NULL,o,o->encoding == REDIS_ENCODING_RAW);
-    return createStringObject(o->ptr,sdslen(o->ptr));
+    robj *d;
+
+    redisAssert(o->type == REDIS_STRING);
+
+    switch(o->encoding) {
+    case REDIS_ENCODING_RAW:
+        return createRawStringObject(o->ptr,sdslen(o->ptr));
+    case REDIS_ENCODING_EMBSTR:
+        return createEmbeddedStringObject(o->ptr,sdslen(o->ptr));
+    case REDIS_ENCODING_INT:
+        d = createObject(REDIS_STRING, NULL);
+        d->encoding = REDIS_ENCODING_INT;
+        d->ptr = o->ptr;
+        return d;
+    default:
+        redisPanic("Wrong encoding.");
+        break;
+    }
 }
 
 robj *createListObject(void) {
@@ -284,61 +366,78 @@ robj *tryObjectEncoding(robj *o) {
     sds s = o->ptr;
     size_t len;
 
-    if (o->encoding != REDIS_ENCODING_RAW)
-        return o; /* Already encoded */
-
-    /* It's not safe to encode shared objects: shared objects can be shared
-     * everywhere in the "object space" of Redis. Encoded objects can only
-     * appear as "values" (and not, for instance, as keys) */
-     if (o->refcount > 1) return o;
-
-    /* Currently we try to encode only strings */
+    /* Make sure this is a string object, the only type we encode
+     * in this function. Other types use encoded memory efficient
+     * representations but are handled by the commands implementing
+     * the type. */
     redisAssertWithInfo(NULL,o,o->type == REDIS_STRING);
 
-    /* Check if we can represent this string as a long integer */
+    /* We try some specialized encoding only for objects that are
+     * RAW or EMBSTR encoded, in other words objects that are still
+     * in represented by an actually array of chars. */
+    if (!sdsEncodedObject(o)) return o;
+
+    /* It's not safe to encode shared objects: shared objects can be shared
+     * everywhere in the "object space" of Redis and may end in places where
+     * they are not handled. We handle them only as values in the keyspace. */
+     if (o->refcount > 1) return o;
+
+    /* Check if we can represent this string as a long integer.
+     * Note that we are sure that a string larger than 21 chars is not
+     * representable as a 32 nor 64 bit integer. */
     len = sdslen(s);
-    if (len > 21 || !string2l(s,len,&value)) {
-        /* We can't encode the object...
-         *
-         * Do the last try, and at least optimize the SDS string inside
-         * the string object to require little space, in case there
-         * is more than 10% of free space at the end of the SDS string.
-         *
-         * We do that for larger strings, using the arbitrary value
-         * of 32 bytes. This code was backported from the unstable branch
-         * where this is performed when the object is too large to be
-         * encoded as EMBSTR. */
-        if (len > 32 &&
-            o->encoding == REDIS_ENCODING_RAW &&
-            sdsavail(s) > len/10)
+    if (len <= 21 && string2l(s,len,&value)) {
+        /* This object is encodable as a long. Try to use a shared object.
+         * Note that we avoid using shared integers when maxmemory is used
+         * because every object needs to have a private LRU field for the LRU
+         * algorithm to work well. */
+        if ((server.maxmemory == 0 ||
+             (server.maxmemory_policy != REDIS_MAXMEMORY_VOLATILE_LRU &&
+              server.maxmemory_policy != REDIS_MAXMEMORY_ALLKEYS_LRU)) &&
+            value >= 0 &&
+            value < REDIS_SHARED_INTEGERS)
         {
-            o->ptr = sdsRemoveFreeSpace(o->ptr);
+            decrRefCount(o);
+            incrRefCount(shared.integers[value]);
+            return shared.integers[value];
+        } else {
+            if (o->encoding == REDIS_ENCODING_RAW) sdsfree(o->ptr);
+            o->encoding = REDIS_ENCODING_INT;
+            o->ptr = (void*) value;
+            return o;
         }
-        /* Return the original object. */
-        return o;
     }
 
-    /* Ok, this object can be encoded...
-     *
-     * Can I use a shared object? Only if the object is inside a given range
-     *
-     * Note that we also avoid using shared integers when maxmemory is used
-     * because every object needs to have a private LRU field for the LRU
-     * algorithm to work well. */
-    if ((server.maxmemory == 0 ||
-         (server.maxmemory_policy != REDIS_MAXMEMORY_VOLATILE_LRU &&
-          server.maxmemory_policy != REDIS_MAXMEMORY_ALLKEYS_LRU)) &&
-        value >= 0 && value < REDIS_SHARED_INTEGERS)
-    {
+    /* If the string is small and is still RAW encoded,
+     * try the EMBSTR encoding which is more efficient.
+     * In this representation the object and the SDS string are allocated
+     * in the same chunk of memory to save space and cache misses. */
+    if (len <= REDIS_ENCODING_EMBSTR_SIZE_LIMIT) {
+        robj *emb;
+
+        if (o->encoding == REDIS_ENCODING_EMBSTR) return o;
+        emb = createEmbeddedStringObject(s,sdslen(s));
         decrRefCount(o);
-        incrRefCount(shared.integers[value]);
-        return shared.integers[value];
-    } else {
-        o->encoding = REDIS_ENCODING_INT;
-        sdsfree(o->ptr);
-        o->ptr = (void*) value;
-        return o;
+        return emb;
     }
+
+    /* We can't encode the object...
+     *
+     * Do the last try, and at least optimize the SDS string inside
+     * the string object to require little space, in case there
+     * is more than 10% of free space at the end of the SDS string.
+     *
+     * We do that only for relatively large strings as this branch
+     * is only entered if the length of the string is greater than
+     * REDIS_ENCODING_EMBSTR_SIZE_LIMIT. */
+    if (o->encoding == REDIS_ENCODING_RAW &&
+        sdsavail(s) > len/10)
+    {
+        o->ptr = sdsRemoveFreeSpace(o->ptr);
+    }
+
+    /* Return the original object. */
+    return o;
 }
 
 /* Get a decoded version of an encoded object (returned as a new object).
@@ -346,7 +445,7 @@ robj *tryObjectEncoding(robj *o) {
 robj *getDecodedObject(robj *o) {
     robj *dec;
 
-    if (o->encoding == REDIS_ENCODING_RAW) {
+    if (sdsEncodedObject(o)) {
         incrRefCount(o);
         return o;
     }
@@ -378,19 +477,19 @@ int compareStringObjectsWithFlags(robj *a, robj *b, int flags) {
     size_t alen, blen, minlen;
 
     if (a == b) return 0;
-    if (a->encoding != REDIS_ENCODING_RAW) {
-        alen = ll2string(bufa,sizeof(bufa),(long) a->ptr);
-        astr = bufa;
-    } else {
+    if (sdsEncodedObject(a)) {
         astr = a->ptr;
         alen = sdslen(astr);
-    }
-    if (b->encoding != REDIS_ENCODING_RAW) {
-        blen = ll2string(bufb,sizeof(bufb),(long) b->ptr);
-        bstr = bufb;
     } else {
+        alen = ll2string(bufa,sizeof(bufa),(long) a->ptr);
+        astr = bufa;
+    }
+    if (sdsEncodedObject(b)) {
         bstr = b->ptr;
         blen = sdslen(bstr);
+    } else {
+        blen = ll2string(bufb,sizeof(bufb),(long) b->ptr);
+        bstr = bufb;
     }
     if (flags & REDIS_COMPARE_COLL) {
         return strcoll(astr,bstr);
@@ -419,7 +518,10 @@ int collateStringObjects(robj *a, robj *b) {
  * this function is faster then checking for (compareStringObject(a,b) == 0)
  * because it can perform some more optimization. */
 int equalStringObjects(robj *a, robj *b) {
-    if (a->encoding != REDIS_ENCODING_RAW && b->encoding != REDIS_ENCODING_RAW){
+    if (a->encoding == REDIS_ENCODING_INT &&
+        b->encoding == REDIS_ENCODING_INT){
+        /* If both strings are integer encoded just check if the stored
+         * long is the same. */
         return a->ptr == b->ptr;
     } else {
         return compareStringObjects(a,b) == 0;
@@ -428,7 +530,7 @@ int equalStringObjects(robj *a, robj *b) {
 
 size_t stringObjectLen(robj *o) {
     redisAssertWithInfo(NULL,o,o->type == REDIS_STRING);
-    if (o->encoding == REDIS_ENCODING_RAW) {
+    if (sdsEncodedObject(o)) {
         return sdslen(o->ptr);
     } else {
         char buf[32];
@@ -445,7 +547,7 @@ int getDoubleFromObject(robj *o, double *target) {
         value = 0;
     } else {
         redisAssertWithInfo(NULL,o,o->type == REDIS_STRING);
-        if (o->encoding == REDIS_ENCODING_RAW) {
+        if (sdsEncodedObject(o)) {
             errno = 0;
             value = strtod(o->ptr, &eptr);
             if (isspace(((char*)o->ptr)[0]) ||
@@ -487,7 +589,7 @@ int getLongDoubleFromObject(robj *o, long double *target) {
         value = 0;
     } else {
         redisAssertWithInfo(NULL,o,o->type == REDIS_STRING);
-        if (o->encoding == REDIS_ENCODING_RAW) {
+        if (sdsEncodedObject(o)) {
             errno = 0;
             value = strtold(o->ptr, &eptr);
             if (isspace(((char*)o->ptr)[0]) || eptr[0] != '\0' ||
@@ -525,7 +627,7 @@ int getLongLongFromObject(robj *o, long long *target) {
         value = 0;
     } else {
         redisAssertWithInfo(NULL,o,o->type == REDIS_STRING);
-        if (o->encoding == REDIS_ENCODING_RAW) {
+        if (sdsEncodedObject(o)) {
             errno = 0;
             value = strtoll(o->ptr, &eptr, 10);
             if (isspace(((char*)o->ptr)[0]) || eptr[0] != '\0' ||
@@ -580,17 +682,19 @@ char *strEncoding(int encoding) {
     case REDIS_ENCODING_ZIPLIST: return "ziplist";
     case REDIS_ENCODING_INTSET: return "intset";
     case REDIS_ENCODING_SKIPLIST: return "skiplist";
+    case REDIS_ENCODING_EMBSTR: return "embstr";
     default: return "unknown";
     }
 }
 
-/* Given an object returns the min number of seconds the object was never
+/* Given an object returns the min number of milliseconds the object was never
  * requested, using an approximated LRU algorithm. */
-unsigned long estimateObjectIdleTime(robj *o) {
-    if (server.lruclock >= o->lru) {
-        return (server.lruclock - o->lru) * REDIS_LRU_CLOCK_RESOLUTION;
+unsigned long long estimateObjectIdleTime(robj *o) {
+    unsigned long long lruclock = LRU_CLOCK();
+    if (lruclock >= o->lru) {
+        return (lruclock - o->lru) * REDIS_LRU_CLOCK_RESOLUTION;
     } else {
-        return ((REDIS_LRU_CLOCK_MAX - o->lru) + server.lruclock) *
+        return (lruclock + (REDIS_LRU_CLOCK_MAX - o->lru)) *
                     REDIS_LRU_CLOCK_RESOLUTION;
     }
 }
@@ -627,7 +731,7 @@ void objectCommand(redisClient *c) {
     } else if (!strcasecmp(c->argv[1]->ptr,"idletime") && c->argc == 3) {
         if ((o = objectCommandLookupOrReply(c,c->argv[2],shared.nullbulk))
                 == NULL) return;
-        addReplyLongLong(c,estimateObjectIdleTime(o));
+        addReplyLongLong(c,estimateObjectIdleTime(o)/1000);
     } else {
         addReplyError(c,"Syntax error. Try OBJECT (refcount|encoding|idletime)");
     }

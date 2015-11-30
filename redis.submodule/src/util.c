@@ -38,8 +38,10 @@
 #include <sys/time.h>
 #include <float.h>
 #include <stdint.h>
+#include <errno.h>
 
 #include "util.h"
+#include "sha1.h"
 
 /* Glob-style pattern matching. */
 int stringmatchlen(const char *pattern, int patternLen,
@@ -169,11 +171,12 @@ int stringmatch(const char *pattern, const char *string, int nocase) {
 }
 
 /* Convert a string representing an amount of memory into the number of
- * bytes, so for instance memtoll("1Gi") will return 1073741824 that is
+ * bytes, so for instance memtoll("1Gb") will return 1073741824 that is
  * (1024*1024*1024).
  *
  * On parsing error, if *err is not NULL, it's set to 1, otherwise it's
- * set to 0 */
+ * set to 0. On error the function return value is 0, regardless of the
+ * fact 'err' is NULL or not. */
 long long memtoll(const char *p, int *err) {
     const char *u;
     char buf[128];
@@ -182,6 +185,7 @@ long long memtoll(const char *p, int *err) {
     unsigned int digits;
 
     if (err) *err = 0;
+
     /* Search the first non digit character. */
     u = p;
     if (*u == '-') u++;
@@ -202,16 +206,26 @@ long long memtoll(const char *p, int *err) {
         mul = 1024L*1024*1024;
     } else {
         if (err) *err = 1;
-        mul = 1;
+        return 0;
     }
+
+    /* Copy the digits into a buffer, we'll use strtoll() to convert
+     * the digit (without the unit) into a number. */
     digits = u-p;
     if (digits >= sizeof(buf)) {
         if (err) *err = 1;
-        return LLONG_MAX;
+        return 0;
     }
     memcpy(buf,p,digits);
     buf[digits] = '\0';
-    val = strtoll(buf,NULL,10);
+
+    char *endptr;
+    errno = 0;
+    val = strtoll(buf,&endptr,10);
+    if ((val == 0 && errno == EINVAL) || *endptr != '\0') {
+        if (err) *err = 1;
+        return 0;
+    }
     return val*mul;
 }
 
@@ -385,7 +399,7 @@ int string2l(const char *s, size_t slen, long *lval) {
 }
 
 /* Convert a double to a string representation. Returns the number of bytes
- * required. The representation should always be parsable by stdtod(3). */
+ * required. The representation should always be parsable by strtod(3). */
 int d2string(char *buf, size_t len, double value) {
     if (isnan(value)) {
         len = snprintf(buf,len,"nan");
@@ -428,11 +442,44 @@ int d2string(char *buf, size_t len, double value) {
  * having run_id == A, and you reconnect and it has run_id == B, you can be
  * sure that it is either a different instance or it was restarted. */
 void getRandomHexChars(char *p, unsigned int len) {
-    FILE *fp = fopen("/dev/urandom","r");
     char *charset = "0123456789abcdef";
     unsigned int j;
 
-    if (fp == NULL || fread(p,len,1,fp) == 0) {
+    /* Global state. */
+    static int seed_initialized = 0;
+    static unsigned char seed[20]; /* The SHA1 seed, from /dev/urandom. */
+    static uint64_t counter = 0; /* The counter we hash with the seed. */
+
+    if (!seed_initialized) {
+        /* Initialize a seed and use SHA1 in counter mode, where we hash
+         * the same seed with a progressive counter. For the goals of this
+         * function we just need non-colliding strings, there are no
+         * cryptographic security needs. */
+        FILE *fp = fopen("/dev/urandom","r");
+        if (fp && fread(seed,sizeof(seed),1,fp) == 1)
+            seed_initialized = 1;
+        if (fp) fclose(fp);
+    }
+
+    if (seed_initialized) {
+        while(len) {
+            unsigned char digest[20];
+            SHA1_CTX ctx;
+            unsigned int copylen = len > 20 ? 20 : len;
+
+            SHA1Init(&ctx);
+            SHA1Update(&ctx, seed, sizeof(seed));
+            SHA1Update(&ctx, (unsigned char*)&counter,sizeof(counter));
+            SHA1Final(digest, &ctx);
+            counter++;
+
+            memcpy(p,digest,copylen);
+            /* Convert to hex digits. */
+            for (j = 0; j < copylen; j++) p[j] = charset[p[j] & 0x0F];
+            len -= copylen;
+            p += copylen;
+        }
+    } else {
         /* If we can't read from /dev/urandom, do some reasonable effort
          * in order to create some entropy, since this function is used to
          * generate run_id and cluster instance IDs */
@@ -459,14 +506,12 @@ void getRandomHexChars(char *p, unsigned int len) {
             x += sizeof(pid);
         }
         /* Finally xor it with rand() output, that was already seeded with
-         * time() at startup. */
-        for (j = 0; j < len; j++)
+         * time() at startup, and convert to hex digits. */
+        for (j = 0; j < len; j++) {
             p[j] ^= rand();
+            p[j] = charset[p[j] & 0x0F];
+        }
     }
-    /* Turn it into hex digits taking just 4 bits out of 8 for every byte. */
-    for (j = 0; j < len; j++)
-        p[j] = charset[p[j] & 0x0F];
-    if (fp) fclose(fp);
 }
 
 /* Given the filename, return the absolute path as an SDS string, or NULL
