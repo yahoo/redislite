@@ -128,7 +128,7 @@ class InstallRedis(install):
 #  without running setup() to allow external scripts to see the setup settings.
 args = {
     'name': 'redislite',
-    'version': '1.0.62',
+    'version': '3.0.0',
     'author': 'Dwight Hubbard',
     'author_email': 'dhubbard@yahoo-inc.com',
     'url': 'https://github.com/yahoo/redislite',
