@@ -66,6 +66,7 @@ class RedisMixin(object):
         Stop the redis-server for this instance if it's running
         :return:
         """
+        import psutil
 
         if self.pid:
             logger.debug('Connection count: %s', self._connection_count())
