@@ -21,6 +21,7 @@ import signal
 import subprocess
 import tempfile
 import time
+import sys
 from . import configuration
 from . import __redis_executable__
 
@@ -61,11 +62,14 @@ class RedisMixin(object):
     redis_configuration = None
     redis_configuration_filename = None
 
-    def _cleanup(self):
+    def _cleanup(self, sys_modules=None):
         """
         Stop the redis-server for this instance if it's running
         :return:
         """
+        if sys_modules:
+            import sys
+            sys.modules.update(sys_modules)
 
         if self.pid:
             logger.debug('Connection count: %s', self._connection_count())
@@ -312,7 +316,7 @@ class RedisMixin(object):
 
         logger.debug('Setting up redis with rdb file: %s', self.dbfilename)
         logger.debug('Setting up redis with socket file: %s', self.socket_file)
-        atexit.register(self._cleanup)
+        atexit.register(self._cleanup, sys.modules.copy())
         if self._is_redis_running() and not self.socket_file:
             self._load_setting_registry()
             logger.debug(
