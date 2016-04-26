@@ -47,7 +47,10 @@ Requirements
 ------------
 The redislite module requires Python 2.7 or higher.
 
-Make sure Python development headers are available when installing redislite. 
+Installing on Linux
+~~~~~~~~~~~~~~~~~~~
+
+Make sure Python development headers are available when installing redislite.
 
 On Ubuntu/Debian systems, install them with:
 
@@ -60,27 +63,28 @@ On Redhat/Fedora systems, install them with:
 .. code-block::
 
     yum install python-devel
-    
-On Mac OSX you may need the XCode command line utilities installed.  If you do
-not have xcode installed on recent OSX releases they can be installed by
-running:
 
-.. code-block::
+Installing on Mac OSX
+~~~~~~~~~~~~~~~~~~~~~
+
+Redislite for OSX comes as a wheel package by default that can be installed
+using current versions of pip.
+
+To install Redislite on MacOSX using the sdist package instead you may need
+the XCode command line utilities installed.  If you do not have xcode
+installed on recent OSX releases they can be installed by
+running::
 
     xcode-select --install
 
 Note redislite and its dependencies use the gcc compiler. On OSX you may run
 into errors indicating that your machine is using clang to compile instead, for
-example:
-
-.. code-block::
+example::
 
     clang: error: unknown argument: '-mno-fused-madd' [-Wunused-command-line-argument-hard-error-in-future]
 
 If this is the case, set your environment variable to override the use of clang
-in favor of gcc:
-
-.. code-block::
+in favor of gcc::
 
     CC=gcc
 
@@ -121,6 +125,7 @@ Getting Started
 
 Usage
 =====
+
 redislite provides enhanced versions of the redis.Redis() and 
 redis.StrictRedis() classes that  take the same arguments as the corresponding
 redis classes and take one additional optional argument.  Which is the
