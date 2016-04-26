@@ -39,8 +39,8 @@ Description
 ===========
 Self contained Python interface to the Redis key-value store.
 
-It makes it possible to use Redis without the need to install and configure
-a redis server.
+It makes it possible to use Redis securely without the need to install and
+configure a redis server.
 
 
 Requirements
@@ -147,7 +147,8 @@ Here we open a Python shell and set a key in our embedded Redis db
     >>> redis_connection.get('key')
     'value'
 
-Here we open the same Redis db and access the key we created during the last run
+Here we open the same Redis db and access the key we created during the last
+run
 
 .. code-block:: python
 
@@ -172,10 +173,10 @@ redis_collections module.
     >>> td.keys()
     ['foo']
 
-Finally it's possible ot spin up multiple instances with different configuration
-values for the Redis server.  Here is an example that sets up 2 redis instances.
-One instance is configured to listen on port 8002, the second instance is a
-slave of the first instance.
+Finally it's possible ot spin up multiple instances with different
+configuration values for the Redis server.  Here is an example that sets up 2
+redis instances.  One instance is configured to listen on port 8002, the
+second instance is a read-only slave of the first instance.
 
 
 .. code-block:: python

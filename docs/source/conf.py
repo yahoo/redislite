@@ -12,22 +12,19 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 import os
-
+import redislite as doc_module
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = 'default'
 
 # The short X.Y version.
-version = '1.0.13'
+version = doc_module.__version__
 # The full version, including alpha/beta/rc tags.
-release = '1.0.13'
+release = version
 
-if not os.environ.get('READTHEDOCS', None):  # only import and set the theme if we're building docs locally
-    import redislite
-    version = redislite.__version__
-    release = version
-
+# only import and set the theme if we're building docs locally
+if not os.environ.get('READTHEDOCS', None):
     import sphinx_rtd_theme
     html_theme = 'sphinx_rtd_theme'
     html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
@@ -50,6 +47,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
+    'sphinx.ext.napoleon',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -273,4 +271,15 @@ texinfo_documents = [
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'http://docs.python.org/': None}
+intersphinx_mapping = {
+    'python': ('http://docs.python.org/3', None),
+    'urllib3': ('http://urllib3.readthedocs.org/en/latest', None),
+    'requests': ('http://docs.python-requests.org/en/latest/', None),
+    'virtualenv': ('http://virtualenv.readthedocs.org/en/latest/', None),
+    'tox': ('https://tox.readthedocs.org/en/latest/', None),
+    'nose': ('https://nose.readthedocs.org/en/latest/', None),
+    'coverage': ('https://coverage.readthedocs.org/en/coverage-4.0.3/', None),
+    'pep8': ('https://pep8.readthedocs.org/en/latest/', None),
+    'pylint': ('https://docs.pylint.org/', None),
+    'redis': ('https://redis-py.readthedocs.org/', None)
+}

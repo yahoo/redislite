@@ -63,8 +63,24 @@ DEFAULT_REDIS_SETTINGS = {
 
 def settings(**kwargs):
     """
-    Return a config settings based on the defaults and the arguments passed
-    :return:
+    Get config settings based on the defaults and the arguments passed
+
+    Parameters
+    ----------
+    **kwargs
+        Redis server arguments, the keyword is the setting, the value is the
+        value.
+        If the value is of type list, the setting will be  set multiple times
+        once with each value.
+        If the value is None, the setting will be removed from the default
+        settings if it exists.
+
+    Returns
+    -------
+    dict
+        Dictionary containing redis server settings, with the key being the
+        setting name.  The values are the settings.  If the value is a list
+        the setting will be repeated with each specified value.
     """
     new_settings = copy(DEFAULT_REDIS_SETTINGS)
     new_settings.update(kwargs)
@@ -100,5 +116,7 @@ def config(**kwargs):
                 configuration += '{key} {value}\n'.format(
                     key=key, value=config_dict[key]
                 )
+        else:
+            del config_dict[key]
     logger.debug('Using configuration: %s', configuration)
     return configuration
