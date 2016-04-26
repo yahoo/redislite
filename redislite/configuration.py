@@ -5,11 +5,9 @@
 This module contains functions to generate a redis configuration from a
 configuration template.
 """
-
-from jinja2 import Template
-
-
 import logging
+from copy import copy
+from jinja2 import Template
 
 
 logger = logging.getLogger(__name__)
@@ -815,32 +813,36 @@ aof-rewrite-incremental-fsync {{ aof_rewrite_incremental_fsync }}
 
 
 DEFAULT_REDIS_SETTINGS = {
+    'activerehashing': 'yes',
+    'aof_rewrite_incremental_fsync': 'yes',
+    'appendonly': 'no',
+    'appendfilename': '"appendonly.aof"',
+    'appendfsync': 'everysec',
+    'auto_aof_rewrite_percentage': '100',
+    'auto_aof_rewrite_min_size': '64mb',
+    'bind': None,
     'daemonize': 'yes',
+    'databases': '16',
+    'dbdir': './',
+    'dbfilename': 'redis.db',
     'pidfile': '/var/run/redislite/redis.pid',
-    'tcp_backlog': '511',
     'port': '0',
+    'save': ['900 1', '300 100', '60 200', '15 1000'],
+    'tcp_backlog': '511',
     'unixsocket': '/var/run/redislite/redis.socket',
     'unixsocketperm': '700',
     'tcp_keepalive': '0',
     'loglevel': 'notice',
     'logfile' : 'redis.log',
-    'databases': '16',
     'stop_writes_on_bgsave_error': 'yes',
     'rdbcompression': 'yes',
     'rdbchecksum': 'yes',
     'timeout': '0',
-    'dbfilename': 'redis.db',
-    'dbdir': './',
     'slave_serve_stale_data': 'yes',
     'slave_read_only': 'yes',
     'repl_disable_tcp_nodelay': 'no',
     'slave_priority': '100',
-    'appendonly': 'no',
-    'appendfilename': '"appendonly.aof"',
-    'appendfsync': 'everysec',
     'no_appendfsync_on_rewrite': 'no',
-    'auto_aof_rewrite_percentage': '100',
-    'auto_aof_rewrite_min_size': '64mb',
     'aof_load_truncated': 'yes',
     'lua_time_limit': '5000',
     'slowlog_log_slower_than': '10000',
@@ -855,9 +857,7 @@ DEFAULT_REDIS_SETTINGS = {
     'zset_max_ziplist_entries': '128',
     'zset_max_ziplist_value': '64',
     'hll_sparse_max_bytes': '3000',
-    'activerehashing': 'yes',
     'hz': '10',
-    'aof_rewrite_incremental_fsync': 'yes'
 }
 
 
@@ -872,9 +872,38 @@ def settings(**kwargs):
     return new_settings
 
 
+def config_from_template(**kwargs):
+    """
+    Generate a redis configuration file based on the passed arguments
+
+    Returns
+    -------
+    str
+        Redis server configuration
+    """
+    return REDIS_SERVER_TEMPLATE.render(**settings(**kwargs))
+
 def config(**kwargs):
     """
     Generate a redis configuration file based on the passed arguments
-    :return:
+
+    Returns
+    -------
+    str
+        Redis server configuration
     """
-    return REDIS_SERVER_TEMPLATE.render(**settings(**kwargs))
+    # Get our settings
+    config_dict = copy(DEFAULT_REDIS_SETTINGS)
+    config_dict.update(**kwargs)
+
+    configuration = ''
+    for key, value in config_dict.items():
+        if value:
+            if isinstance(value, list):
+                for item in value:
+                    configuration += '{key} {value}\n'.format(
+                        key=key, value=item
+                    )
+            else:
+                configuration += '{key} {value}\n'.format(key=key, value=value)
+    return configuration
