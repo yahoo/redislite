@@ -88,6 +88,7 @@ class TestRedisliteConfiguration(unittest.TestCase):
     def test_configuration_settings(self):
         import redislite.configuration
         result = redislite.configuration.settings()
+        del result['save']  # Save is a list which doesn't work with set
         result_set = set(result.items())
         expected_subset = set(
             {
@@ -125,7 +126,7 @@ class TestRedisliteConfiguration(unittest.TestCase):
                 dbfilename='test.db',
                 slaveof='localhost 6397'
         )
-        self.assertIn(' slaveof localhost 6397', result)
+        self.assertIn('slaveof localhost 6397', result)
 
 
 if __name__ == '__main__':
