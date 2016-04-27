@@ -293,6 +293,8 @@ class TestRedisliteClient(unittest.TestCase):
         db._cleanup()
         del db
         db = redislite.StrictRedis('bug.redis')
+        if os.path.exists('bug.redis'):
+            os.remove('bug.redis')
 
 
 if __name__ == '__main__':
