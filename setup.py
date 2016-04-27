@@ -136,8 +136,8 @@ args = {
     'keywords': 'Redis sqlite',
     'packages': ['redislite'],
     'description': 'Redis built into a python package',
-    'install_requires': ['redis', 'psutil', 'jinja2'],
-    'requires': ['redis', 'psutil', 'jinja2'],
+    'install_requires': ['redis', 'psutil'],
+    'requires': ['redis', 'psutil'],
     'long_description': readme(),
     'classifiers': [
             'Development Status :: 4 - Beta',

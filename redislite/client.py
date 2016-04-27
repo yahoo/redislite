@@ -75,8 +75,8 @@ class RedisMixin(object):
             logger.debug('Connection count: %s', self._connection_count())
             if self._connection_count() <= 1:
                 logger.debug(
-                    'Last client using the connection, shutting down the redis '
-                    'connection on socket: %s',
+                    'Last client using the connection, shutting down the '
+                    'redis connection on socket: %s',
                     self.socket_file
                 )
                 # noinspection PyUnresolvedReferences
@@ -86,12 +86,16 @@ class RedisMixin(object):
                 self.shutdown()
                 self.socket_file = None
 
-                if self.pidfile and os.path.exists(self.pidfile):   # pragma: no cover
+                if self.pidfile and os.path.exists(
+                        self.pidfile
+                ):   # pragma: no cover
                     # noinspection PyTypeChecker
                     pid = int(open(self.pidfile).read())
                     os.kill(pid, signal.SIGKILL)
 
-                if self.redis_dir and os.path.isdir(self.redis_dir):  # pragma: no cover
+                if self.redis_dir and os.path.isdir(
+                        self.redis_dir
+                ):  # pragma: no cover
                     shutil.rmtree(self.redis_dir)
 
                 if self.cleanupregistry and os.path.exists(
@@ -261,7 +265,9 @@ class RedisMixin(object):
             if pid_number:
                 process = psutil.Process(pid_number)
                 if not process.is_running():  # pragma: no cover
-                    logger.warn('Loaded registry for non-existant redis-server')
+                    logger.warn(
+                        'Loaded registry for non-existant redis-server'
+                    )
                     return
         else:  # pragma: no cover
             logger.warn('No pidfile found')
@@ -275,17 +281,39 @@ class RedisMixin(object):
         """
         Wrapper for redis.Redis that configures a redis instance based on the
         passed settings.
-        :param args:
-        :param kwargs:
-        :return:
+
+        Parameters
+        ==========
+        db_filename : str, optional
+            Path to the redis rdb file to back the redis instance, if not
+            specified one will be created inside a temporary directory for
+            the instance.
+
+        serverconfig : dict, optional
+            A dict containing redis server settings.  The key is the setting
+            the value can be a string, list or None.
+
+            If the value is a string it will be used as the value in the redis
+            configuration.
+
+            If the value is a list the same setting will be repeated multiple
+            times in the redis configuration with each value in order.
+
+            If the value is None, the setting will be removed from the
+            default configuration if it is set.
         """
         # If the user is specifying settings we can't configure just pass the
         # request to the redis.Redis module
         if 'host' in kwargs.keys() or 'port' in kwargs.keys():
-            return super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
+            super(RedisMixin, self).__init__(
+                *args, **kwargs
+            )  # pragma: no cover
+            return
 
         self.socket_file = kwargs.get('unix_socket_path', None)
-        if self.socket_file and self.socket_file == os.path.basename(self.socket_file):
+        if self.socket_file and self.socket_file == os.path.basename(
+                self.socket_file
+        ):
             self.socket_file = os.path.join(os.getcwd(), self.socket_file)
 
         db_filename = None
@@ -386,100 +414,96 @@ class Redis(RedisMixin, redis.Redis):
     that uses an embedded redis-server by default.
 
 
-    Example:
-        redis_connection = :class:`redislite.Redis('/tmp/redis.db')`
+    Parameters
+    ----------
+
+    dbfilename : str, optional
+
+        The name of the Redis db file to be used.
+
+        This argument is only used if the embedded redis-server is used.
+
+        The value of this argument is provided as the "dbfilename" setting in
+        the embedded redis server configuration.  This will result in the
+        embedded redis server dumping it's database to this file on exit/close.
+
+        This will also result in the embedded redis server using an
+        existing redis rdb database if the file exists on start.
+
+        If this file exists and is in use by another redislite instance,
+        this class will get a reference to the existing running redis
+        instance so both instances share the same redis-server process
+        and don't corrupt the db file.
+
+    serverconfig : dict, optional
+
+        A dictionary of additional redis-server configuration settings.
+        The key is the name of the setting in the configuration file, the
+        values may be list, str, or None.
+
+        If the value is a list the setting will be repeated in the
+        configuration, once for each value.
+
+        If the value is a string, the setting will occur once with that string
+        as the setting.
+
+        If the value is None, the setting will be removed from the default
+        setting values if it exists in the defaults.
+
+    host : str, optional
+
+        The hostname or ip address of the redis server to connect to.
+
+        If this argument is specified the embedded redis server will not be
+        used.
+
+    port : int, optional
+
+        The port number of the redis server to connect to.
+
+        If this argument is specified, the embedded redis server will not be
+        used.
+
+    **kwargs : optional
+        All other keyword arguments supported by the :py:class:`redis.Redis()`
+        class are supported.
+
+    Returns
+    -------
+
+    A :class:`redislite.Redis()` object
+
+    Raises
+    ------
+
+    RedisLiteServerStartError
+        The embedded Redis server failed to start
+
+    Example
+    -------
+
+    redis_connection = :class:`redislite.Redis('/tmp/redis.db')`
+
+    Notes
+    -----
+
+    If the dbfilename argument is not provided each instance will get a
+    different redis-server instance.
 
 
-    Notes:
-        If the dbfilename argument is not provided each instance will get a
-        different redis-server instance.
+    Attributes
+    ----------
+    db : string
+        The fully qualified filename associated with the redis dbfilename
+        configuration setting.  This attribute is read only.
 
+    pid :int
+        Pid of the running embedded redis server, this attribute is read
+        only.
 
-    Args:
-        dbfilename(str):
-            The name of the Redis db file to be used.  This argument is only
-            used if the embedded redis-server is used.  The value of this
-            argument is provided as the "dbfilename" setting in the embedded
-            redis server configuration.  This will result in the embedded
-            redis server dumping it's database to this file on exit/close.
-            This will also result in the embedded redis server using an
-            existing redis rdb database if the file exists on start.
-            If this file exists and is in use by another redislite instance,
-            this class will get a reference to the existing running redis
-            instance so both instances share the same redis-server process
-            and don't corrupt the db file.
-
-    Kwargs:
-        host(str):
-            The hostname or ip address of the redis server to connect to.  If
-            this argument is not None, the embedded redis server will not be
-            used.  Defaults to None.
-
-        port(int): The port number of the redis server to connect to.  If this
-            argument is not None, the embedded redis server will not be used.
-            Defaults to None.
-
-        serverconfig(dict): A dictionary of additional redis-server
-            configuration settings.  All keys and values must be str.
-            Supported keys are:
-                activerehashing,
-                aof_rewrite_incremental_fsync,
-                appendfilename,
-                appendfsync,
-                appendonly,
-                auto_aof_rewrite_min_size,
-                auto_aof_rewrite_percentage,
-                aof_load_truncated,
-                databases,
-                hash_max_ziplist_entries,
-                hash_max_ziplist_value,
-                hll_sparse_max_bytes,
-                hz,
-                latency_monitor_threshold,
-                list_max_ziplist_entries,
-                list_max_ziplist_value,
-                logfile,
-                loglevel,
-                lua_time_limit,
-                no_appendfsync_on_rewrite,
-                notify_keyspace_events,
-                port,
-                rdbchecksum,
-                rdbcompression,
-                repl_disable_tcp_nodelay,
-                slave_read_only,
-                slave_serve_stale_data,
-                stop_writes_on_bgsave_error,
-                tcp_backlog,
-                tcp_keepalive,
-                unixsocket,
-                unixsocketperm,
-                slave_priority,
-                timeout,
-                set_max_intset_entries,
-                zset_max_ziplist_entries,
-                zset_max_ziplist_value
-
-    Returns:
-        A :class:`redis.Redis()` class object if the host or port arguments
-        where set or a :class:`redislite.Redis()` object otherwise.
-
-    Raises:
-        RedisLiteServerStartError
-
-
-    Attributes:
-        db(string):
-            The fully qualified filename associated with the redis dbfilename
-            configuration setting.  This attribute is read only.
-
-        pid(int):
-            Pid of the running embedded redis server, this attribute is read
-            only.
-
-        start_timeout(float):
-            Number of seconds to wait for the redis-server process to start
-            before generating a RedisLiteServerStartError exception.
+    start_timeout : float
+        Number of seconds to wait for the redis-server process to start
+        before generating a RedisLiteServerStartError exception.
     """
     pass
 

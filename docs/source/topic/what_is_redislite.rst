@@ -14,6 +14,20 @@ The enhanced redis bindings include extended versions of the
 contains functions to patch the redis module to use these new extended classes.
 
 
+Secure By Default
+-----------------
+
+Redislite defaults to a redis server configuration that is more secure than
+the default configuration for the redis server.  This is due to the following
+differences:
+
+* Redislite defaults to using unix domain sockets for the redis connection.  So
+  the server is not accessible over the computer network by default.
+
+* Redislite locks down the permissions of the unix domain sockets used to only
+  allow the creating user access.
+
+
 Backwards Compatibility
 -----------------------
 
