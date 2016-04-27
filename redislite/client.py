@@ -219,7 +219,8 @@ class RedisMixin(object):
             time.sleep(.1)
         if timeout:  # pragma: no cover
             raise RedisLiteServerStartError(
-                'The redis-server process failed to start'
+                'The redis-server process failed to start; unreachable after '
+                '{0} seconds'.format(self.start_timeout)
             )
 
     def _is_redis_running(self):
