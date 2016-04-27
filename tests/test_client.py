@@ -279,6 +279,23 @@ class TestRedisliteClient(unittest.TestCase):
         with self.assertRaises(ConnectionError):
             redislite.Redis(port=1).keys()
 
+    def test_shutdown_race_condition(self):
+        """
+        Test that there is no race condition when a shutdown is run after
+        a large data operation.
+        """
+        if os.path.exists('bug.redis'):
+            os.remove('bug.redis')
+        db = redislite.StrictRedis('bug.redis')
+        for key in range(10000):
+            db.hset("h1", os.urandom(32), " " * 65536)
+        db.save()
+        db._cleanup()
+        del db
+        db = redislite.StrictRedis('bug.redis')
+        if os.path.exists('bug.redis'):
+            os.remove('bug.redis')
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
