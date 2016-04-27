@@ -122,7 +122,7 @@ class RedisMixin(object):
         for client in self.client_list():
             flags = client.get('flags', '')
             flags = flags.upper()
-            if 'U' in flags or 'N' in flags:
+            if 'U' in flags or 'N' in flags:  # pragma: no cover
                 active_connections += 1
         return active_connections
 
@@ -196,8 +196,31 @@ class RedisMixin(object):
             raise RedisLiteException(
                 'Redis socket file %s is not present' % self.socket_file
             )
+
         self._save_setting_registry()
         self.running = True
+
+    def _wait_for_server_start(self):
+        """
+        Wait until the server is not busy when receiving a request
+
+        Raises
+        ------
+        RedisLiteServerStartError - Server start timed out
+        """
+        timeout = True
+        for i in range(0, self.start_timeout * 10):
+            try:
+                self.ping()
+                timeout = False
+                break
+            except redis.BusyLoadingError:
+                pass
+            time.sleep(.1)
+        if timeout:  # pragma: no cover
+            raise RedisLiteServerStartError(
+                'The redis-server process failed to start'
+            )
 
     def _is_redis_running(self):
         """
@@ -339,7 +362,7 @@ class RedisMixin(object):
         super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
         logger.debug("Pinging the server to ensure we're connected")
-        self.ping()
+        self._wait_for_server_start()
 
     def __del__(self):
         self._cleanup()  # pragma: no cover
