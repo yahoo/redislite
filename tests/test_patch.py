@@ -132,6 +132,10 @@ class TestRedislitePatch(unittest.TestCase):
         # Both instances should be talking to the same redis server
         self.assertEqual(r.pid, s.pid)
         redislite.patch.unpatch_redis_StrictRedis()
+        r._cleanup()
+        s._cleanup()
+        if os.path.exists(dbfilename):
+            os.remove(dbfilename)
 
 
 if __name__ == '__main__':

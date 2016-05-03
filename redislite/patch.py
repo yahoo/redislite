@@ -12,7 +12,7 @@ import redis
 from .client import Redis, StrictRedis
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # pylint: disable=C0103
 
 
 original_classes = collections.defaultdict(lambda: None)  # pragma: no cover
@@ -111,8 +111,9 @@ def patch_redis_StrictRedis(dbfile=None):
 
     Args:
         dbfile(str):
-            The name of the Redis db file to be used.  If this argument is passed all instances of the
-            :class:`redis.Redis` class will share a single instance of the embedded redis server.
+            The name of the Redis db file to be used.  If this argument is
+            passed all instances of the :class:`redis.Redis` class will share
+            a single instance of the embedded redis server.
 
     Returns:
         This function does not return any values.
@@ -170,14 +171,17 @@ def patch_redis(dbfile=None):
 
 
     Notes:
-        If the dbfile parameter is not passed, each any instances of :class:`redis.StrictRedis()` class with no
-        arguments will get a unique instance of the redis server.  If the dbfile parameter is provided, all instances
-        of :class:`redis.Redis()` will share/reference the same instance of the redis server.
+        If the dbfile parameter is not passed, each any instances of
+        :class:`redis.StrictRedis()` class with no arguments will get a unique
+        instance of the redis server.  If the dbfile parameter is provided, all
+        instances of :class:`redis.Redis()` will share/reference the same
+        instance of the redis server.
 
     Args:
         dbfile(str):
-            The name of the Redis db file to be used.  If this argument is passed all instances of the
-            :class:`redis.Redis()` class will share a single instance of the embedded redis server.
+            The name of the Redis db file to be used.  If this argument is
+            passed all instances of the :class:`redis.Redis()` class will
+            share a single instance of the embedded redis server.
 
     Returns:
         This function does not return any values.
@@ -188,7 +192,8 @@ def patch_redis(dbfile=None):
 
 def unpatch_redis():
     """
-    Unpatch all the redis classes provided by :mod:`redislite` that have been patched.
+    Unpatch all the redis classes provided by :mod:`redislite` that have been
+    patched.
 
     Example:
         unpatch_redis()

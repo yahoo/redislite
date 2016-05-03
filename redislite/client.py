@@ -26,7 +26,7 @@ from . import configuration
 from . import __redis_executable__
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # pylint: disable=C0103
 
 
 class RedisLiteException(Exception):

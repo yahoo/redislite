@@ -9,7 +9,7 @@ import logging
 from copy import copy
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # pylint: disable=C0103
 
 
 DEFAULT_REDIS_SETTINGS = {
