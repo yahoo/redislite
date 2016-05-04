@@ -119,7 +119,7 @@ class InstallRedis(install):
                     )
             # Store the redis-server --version output for later
             for line in os.popen('%s --version' % md['redis_bin']).readlines():
-                line = line.decode().strip()
+                line = line.strip()
                 for item in line.split():
                     if '=' in item:
                         key, value = item.split('=')
