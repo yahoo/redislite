@@ -99,8 +99,9 @@ def config(**kwargs):
     """
     # Get our settings
     config_dict = settings(**kwargs)
-    config_dict['dir'] = config_dict['dbdir']
+    config_dict['dir'] = repr(config_dict['dbdir'])
     del config_dict['dbdir']
+    config_dict['dbfilename'] = repr(config_dict['dbfilename'])
 
     configuration = ''
     keys = list(config_dict.keys())
