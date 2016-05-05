@@ -109,13 +109,14 @@ class TestRedisliteConfiguration(unittest.TestCase):
         result = redislite.configuration.config(
                 pidfile='/var/run/redislite/test.pid',
                 unixsocket='/var/run/redislite/redis.socket',
-                dbdir=os.getcwd(),
+                dbdir='/tmp/test',
                 dbfilename='test.db',
         )
 
         self.assertIn('\ndaemonize yes', result)
         self.assertIn('\npidfile /var/run/redislite/test.pid', result)
-        self.assertIn('\ndbfilename test.db', result)
+        self.assertIn('\ndbfilename \'test.db\'', result)
+        self.assertIn('\ndir \'/tmp/test\'', result)
 
     def test_configuration_config_slave(self):
         import redislite.configuration
