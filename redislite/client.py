@@ -363,9 +363,9 @@ class RedisMixin(object):
             self.dbfilename = os.path.basename(db_filename)
             self.dbdir = os.path.dirname(db_filename)
 
-            self.settingregistryfile = os.path.join(
+            self.settingregistryfile = repr(os.path.join(
                 self.dbdir, self.dbfilename + '.settings'
-            )
+            )).strip("'")
 
         logger.debug('Setting up redis with rdb file: %s', self.dbfilename)
         logger.debug('Setting up redis with socket file: %s', self.socket_file)
@@ -380,9 +380,9 @@ class RedisMixin(object):
 
             if not self.dbdir:
                 self.dbdir = self.redis_dir
-                self.settingregistryfile = os.path.join(
+                self.settingregistryfile = repr(os.path.join(
                     self.dbdir, self.dbfilename + '.settings'
-                )
+                )).strip("'")
             self._start_redis()
 
         kwargs['unix_socket_path'] = self.socket_file

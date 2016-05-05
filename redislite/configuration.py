@@ -16,7 +16,7 @@ DEFAULT_REDIS_SETTINGS = {
     'activerehashing': 'yes',
     'aof-rewrite-incremental-fsync': 'yes',
     'appendonly': 'no',
-    'appendfilename': '"appendonly.aof"',
+    'appendfilename': 'appendonly.aof',
     'appendfsync': 'everysec',
     'aof-load-truncated': 'yes',
     'auto-aof-rewrite-percentage': '100',
@@ -26,34 +26,34 @@ DEFAULT_REDIS_SETTINGS = {
     'databases': '16',
     'dbdir': './',
     'dbfilename': 'redis.db',
+    'hash-max-ziplist-entries': '512',
+    'hash-max-ziplist-value': '64',
+    'hll-sparse-max-bytes': '3000',
+    'hz': '10',
+    'list-max-ziplist-entries': '512',
+    'list-max-ziplist-value': '64',
     'loglevel': 'notice',
     'logfile' : 'redis.log',
+    'lua-time-limit': '5000',
     'pidfile': '/var/run/redislite/redis.pid',
     'port': '0',
     'save': ['900 1', '300 100', '60 200', '15 1000'],
+    'stop-writes-on-bgsave-error': 'yes',
     'tcp-backlog': '511',
     'tcp-keepalive': '0',
-    'stop-writes-on-bgsave-error': 'yes',
     'rdbcompression': 'yes',
     'rdbchecksum': 'yes',
-    'timeout': '0',
     'slave-serve-stale-data': 'yes',
     'slave-read-only': 'yes',
     'repl-disable-tcp-nodelay': 'no',
     'slave-priority': '100',
     'no-appendfsync-on-rewrite': 'no',
-    'lua-time-limit': '5000',
     'slowlog-log-slower-than': '10000',
     'slowlog-max-len': '128',
     'latency-monitor-threshold': '0',
     'notify-keyspace-events': '""',
-    'hash-max-ziplist-entries': '512',
-    'hash-max-ziplist-value': '64',
-    'list-max-ziplist-entries': '512',
-    'list-max-ziplist-value': '64',
     'set-max-intset-entries': '512',
-    'hll-sparse-max-bytes': '3000',
-    'hz': '10',
+    'timeout': '0',
     'unixsocket': '/var/run/redislite/redis.socket',
     'unixsocketperm': '700',
     'zset-max-ziplist-entries': '128',
@@ -105,9 +105,10 @@ def config_line(setting, value):
     str
         The configuration line based on the setting and value
     """
-    if setting in ['dbfilename', 'dbdir']:
-        if ' ' in value and '"' not in value:
-            value = '"' + str(value) + '"'
+    if setting in [
+        'appendfilename', 'dbfilename', 'dbdir', 'dir', 'pidfile', 'unixsocket'
+    ]:
+        value = repr(value)
     return '{setting} {value}'.format(setting=setting, value=value)
 
 

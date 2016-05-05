@@ -78,7 +78,7 @@ class TestRedisliteConfiguration(unittest.TestCase):
         result = redislite.configuration.config_line(
             'dbfilename', 'test file.db'
         )
-        self.assertEqual('dbfilename "test file.db"', result)
+        self.assertEqual("dbfilename 'test file.db'", result)
 
     def test_configuration_config(self):
         result = redislite.configuration.config()
@@ -123,12 +123,12 @@ class TestRedisliteConfiguration(unittest.TestCase):
         )
 
         self.assertIn('\ndaemonize yes', result)
-        self.assertIn('\npidfile ' + pidfile, result)
-        self.assertIn('\ndbfilename test.db', result)
+        self.assertIn('\npidfile ' + repr(pidfile), result)
+        self.assertIn("\ndbfilename 'test.db'", result)
 
     def test_configuration_config_db_with_space(self):
-        pidfile = os.path.join(self.tempdir, 'test.pid')
-        unixsocket = os.path.join(self.tempdir, 'redis.socket')
+        pidfile = os.path.join(self.tempdir, 'test space.pid')
+        unixsocket = os.path.join(self.tempdir, 'test space.socket')
         result = redislite.configuration.config(
             pidfile=pidfile,
             unixsocket=unixsocket,
@@ -137,8 +137,8 @@ class TestRedisliteConfiguration(unittest.TestCase):
         )
 
         self.assertIn('\ndaemonize yes', result)
-        self.assertIn('\npidfile ' + pidfile, result)
-        self.assertIn('\ndbfilename "test space.db"', result)
+        self.assertIn('\npidfile ' + repr(pidfile), result)
+        self.assertIn("\ndbfilename 'test space.db'", result)
 
     def test_configuration_config_slave(self):
         result = redislite.configuration.config(
