@@ -46,10 +46,10 @@ the module and it's build information.
 """
 from __future__ import print_function
 from distutils.spawn import find_executable
+import os
 from .__init__ import __version__, __git_version__, __source_url__, \
     __git_hash__, __git_origin__, __git_branch__, __redis_server_info__, \
     __redis_executable__
-import os
 
 
 def debug_info_list():

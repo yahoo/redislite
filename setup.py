@@ -11,10 +11,13 @@ from setuptools.command.install import install
 from distutils.command.build import build
 from distutils.core import Extension
 import distutils.util
+import sys
 from subprocess import call
 
 
 logger = logging.getLogger(__name__)
+
+UNSUPPORTED_PLATFORMS = ['win32', 'win64']
 METADATA_FILENAME = 'redislite/package_metadata.json'
 BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
@@ -27,7 +30,7 @@ def readme():
         return f.read()
 
 
-class build_redis(build):
+class BuildRedis(build):
     global REDIS_SERVER_METADATA
 
     def run(self):
@@ -71,9 +74,10 @@ class build_redis(build):
 
 
 class InstallRedis(install):
+    build_scripts = None
+
     def initialize_options(self):
         install.initialize_options(self)
-        self.build_scripts = None
 
     def finalize_options(self):
         install.finalize_options(self)
@@ -115,7 +119,8 @@ class InstallRedis(install):
                     )
             # Store the redis-server --version output for later
             for line in os.popen('%s --version' % md['redis_bin']).readlines():
-                for item in line.strip().split():
+                line = line.strip()
+                for item in line.split():
                     if '=' in item:
                         key, value = item.split('=')
                         REDIS_SERVER_METADATA[key] = value
@@ -167,7 +172,7 @@ args = {
     },
     'include_package_data': True,
     'cmdclass': {
-        'build': build_redis,
+        'build': BuildRedis,
         'install': InstallRedis,
     },
 
@@ -265,6 +270,14 @@ def get_and_update_metadata():
 
 
 if __name__ == '__main__':
+    if sys.platform in UNSUPPORTED_PLATFORMS:
+        print(
+            'The redislite module is not supported on the %r '
+            'platform' % sys.platform,
+            file=sys.stderr
+        )
+        sys.exit(1)
+
     os.environ['CC'] = 'gcc'
 
     logging.basicConfig(level=logging.INFO)
