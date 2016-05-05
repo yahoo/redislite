@@ -9,10 +9,13 @@ import getpass
 import inspect
 import logging
 import os
+import shutil
+import tempfile
+import unittest
 import psutil
+import redis
 import redislite
 import redislite.patch
-import unittest
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +55,7 @@ class TestRedislitePatch(unittest.TestCase):
         )
 
     def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
         logger.info(
             'Start Child processes: %d', self._redis_server_processes()
         )
@@ -60,10 +64,12 @@ class TestRedislitePatch(unittest.TestCase):
         logger.info(
             'End Child processes: %d', self._redis_server_processes()
         )
+        if os.path.exists(self.tempdir) and 'tmp' in self.tempdir:
+            shutil.rmtree(self.tempdir)
+            self.tempdir = None
 
     def test_redislite_patch_redis_Redis(self):
         redislite.patch.patch_redis_Redis()
-        import redis
         r = redis.Redis()
         self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
@@ -71,7 +77,6 @@ class TestRedislitePatch(unittest.TestCase):
 
     def test_redislite_patch_redis_StrictRedis(self):
         redislite.patch.patch_redis_StrictRedis()
-        import redis
         r = redis.StrictRedis()
         self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
@@ -80,7 +85,6 @@ class TestRedislitePatch(unittest.TestCase):
     # noinspection PyUnusedLocal
     def test_redislite_patch_redis(self):
         redislite.patch.patch_redis()
-        import redis
         r = redis.Redis()
         self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
@@ -90,7 +94,6 @@ class TestRedislitePatch(unittest.TestCase):
         redislite.patch.unpatch_redis()
 
     def test_redislite_double_patch_redis(self):
-        import redis
         original_redis = redis.Redis
         redislite.patch.patch_redis()
         self.assertNotEqual(original_redis, redis.Redis)
@@ -100,11 +103,13 @@ class TestRedislitePatch(unittest.TestCase):
         self.assertEqual(original_redis, redis.Redis)
 
     def test_redislite_patch_redis_with_dbfile(self):
-        dbfilename = '/tmp/test_redislite_patch_redis_with_dbfile.db'
+        dbfilename = os.path.join(
+            self.tempdir,
+            'test_redislite_patch_redis_with_dbfile.db'
+        )
         if os.path.exists(dbfilename):
             os.remove(dbfilename)
         redislite.patch.patch_redis(dbfilename)
-        import redis
         r = redis.Redis()
         self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid
@@ -116,12 +121,40 @@ class TestRedislitePatch(unittest.TestCase):
         self.assertEqual(r.pid, s.pid)
         redislite.patch.unpatch_redis()
 
+        r._cleanup()
+        s._cleanup()
+        if os.path.exists(dbfilename):
+            os.remove(dbfilename)
+
+    def test_redislite_patch_redis_with_dbfile_in_cwd(self):
+        dbfilename = 'test_redislite_patch_redis_with_dbfile_in_cwd.db'
+        if os.path.exists(dbfilename):
+            os.remove(dbfilename)
+        redislite.patch.patch_redis(dbfilename)
+        r = redis.Redis()
+        self._log_redis_pid(r)
+        self.assertIsInstance(r.pid, int)  # Should have a redislite pid
+        s = redis.Redis()
+        self._log_redis_pid(s)
+        self.assertIsInstance(r.pid, int)  # Should have a redislite pid
+
+        # Both instances should be talking to the same redis server
+        self.assertEqual(r.pid, s.pid)
+        redislite.patch.unpatch_redis()
+
+        r._cleanup()
+        s._cleanup()
+        if os.path.exists(dbfilename):
+            os.remove(dbfilename)
+
     def test_redislite_patch_strictredis_with_dbfile(self):
-        dbfilename = 'test_redislite_patch_redis_with_short_dbfile.db'
+        dbfilename = os.path.join(
+            self.tempdir,
+            'test_redislite_patch_redis_with_short_dbfile.db'
+        )
         if os.path.exists(dbfilename):
             os.remove(dbfilename)
         redislite.patch.patch_redis_StrictRedis(dbfilename)
-        import redis
         r = redis.StrictRedis()
         self._log_redis_pid(r)
         self.assertIsInstance(r.pid, int)    # Should have a redislite pid

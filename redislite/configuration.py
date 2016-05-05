@@ -18,6 +18,7 @@ DEFAULT_REDIS_SETTINGS = {
     'appendonly': 'no',
     'appendfilename': '"appendonly.aof"',
     'appendfsync': 'everysec',
+    'aof-load-truncated': 'yes',
     'auto-aof-rewrite-percentage': '100',
     'auto-aof-rewrite-min-size': '64mb',
     'bind': None,
@@ -25,15 +26,13 @@ DEFAULT_REDIS_SETTINGS = {
     'databases': '16',
     'dbdir': './',
     'dbfilename': 'redis.db',
+    'loglevel': 'notice',
+    'logfile' : 'redis.log',
     'pidfile': '/var/run/redislite/redis.pid',
     'port': '0',
     'save': ['900 1', '300 100', '60 200', '15 1000'],
     'tcp-backlog': '511',
-    'unixsocket': '/var/run/redislite/redis.socket',
-    'unixsocketperm': '700',
     'tcp-keepalive': '0',
-    'loglevel': 'notice',
-    'logfile' : 'redis.log',
     'stop-writes-on-bgsave-error': 'yes',
     'rdbcompression': 'yes',
     'rdbchecksum': 'yes',
@@ -43,7 +42,6 @@ DEFAULT_REDIS_SETTINGS = {
     'repl-disable-tcp-nodelay': 'no',
     'slave-priority': '100',
     'no-appendfsync-on-rewrite': 'no',
-    'aof-load-truncated': 'yes',
     'lua-time-limit': '5000',
     'slowlog-log-slower-than': '10000',
     'slowlog-max-len': '128',
@@ -54,10 +52,12 @@ DEFAULT_REDIS_SETTINGS = {
     'list-max-ziplist-entries': '512',
     'list-max-ziplist-value': '64',
     'set-max-intset-entries': '512',
-    'zset-max-ziplist-entries': '128',
-    'zset-max-ziplist-value': '64',
     'hll-sparse-max-bytes': '3000',
     'hz': '10',
+    'unixsocket': '/var/run/redislite/redis.socket',
+    'unixsocketperm': '700',
+    'zset-max-ziplist-entries': '128',
+    'zset-max-ziplist-value': '64',
 }
 
 
@@ -107,7 +107,7 @@ def config_line(setting, value):
     """
     if setting in ['dbfilename', 'dbdir']:
         if ' ' in value and '"' not in value:
-            value = '"' + value + '"'
+            value = '"' + str(value) + '"'
     return '{setting} {value}'.format(setting=setting, value=value)
 
 

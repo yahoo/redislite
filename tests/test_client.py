@@ -293,8 +293,44 @@ class TestRedisliteClient(unittest.TestCase):
         db._cleanup()
         del db
         db = redislite.StrictRedis('bug.redis')
+        db._cleanup()
         if os.path.exists('bug.redis'):
             os.remove('bug.redis')
+
+    def test_redis_log_attribute(self):
+        r = redislite.StrictRedis()
+        self.assertIn('Server started, Redis version', r.redis_log)
+
+    def test_redis_log_tail(self):
+        r = redislite.StrictRedis()
+        lines = r.redis_log_tail(2)
+        self.assertIsInstance(lines, list)
+        self.assertEqual(len(lines), 2)
+
+    def test_redis_log_many_lines(self):
+        r = redislite.StrictRedis()
+        lines = r.redis_log_tail(lines=99999)
+        self.assertIsInstance(lines, list)
+
+    def test_redis_log_small_chunks(self):
+        r = redislite.StrictRedis()
+        lines = r.redis_log_tail(4, width=20)
+        self.assertIsInstance(lines, list)
+        self.assertEqual(len(lines), 4)
+
+    def test_redis_log_tail_no_log(self):
+        r = redislite.StrictRedis()
+        if os.path.exists(r.logfile):
+            os.remove(r.logfile)
+        lines = r.redis_log_tail()
+        self.assertEqual(lines, [])
+
+    def test_redis_log_tail_empty_log(self):
+        r = redislite.StrictRedis()
+        with open(r.logfile, 'w'):
+            pass
+        lines = r.redis_log_tail()
+        self.assertEqual(lines, [])
 
 
 if __name__ == '__main__':
