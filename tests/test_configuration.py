@@ -12,7 +12,11 @@ import getpass
 import inspect
 import logging
 import os
+import psutil
 import redislite
+import redislite.configuration
+import tempfile
+import shutil
 import unittest
 
 
@@ -36,8 +40,6 @@ class TestRedisliteConfiguration(unittest.TestCase):
         by the current user.
         :return:
         """
-        import psutil
-
         processes = []
         for proc in psutil.process_iter():
             try:
@@ -55,11 +57,15 @@ class TestRedisliteConfiguration(unittest.TestCase):
         )
 
     def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
         logger.info(
             'Start Child processes: %d', self._redis_server_processes()
         )
 
     def tearDown(self):
+        if os.path.exists(self.tempdir) and 'tmp' in self.tempdir:
+            shutil.rmtree(self.tempdir)
+            self.tempdir = None
         logger.info(
             'End Child processes: %d', self._redis_server_processes()
         )
@@ -68,14 +74,17 @@ class TestRedisliteConfiguration(unittest.TestCase):
         import redislite.debug
         redislite.debug.print_debug_info()
 
+    def test_configuration_config_line(self):
+        result = redislite.configuration.config_line(
+            'dbfilename', 'test file.db'
+        )
+        self.assertEqual('dbfilename "test file.db"', result)
+
     def test_configuration_config(self):
-        import redislite.configuration
         result = redislite.configuration.config()
         self.assertIn('\ndaemonize yes', result)
 
-
     def test_configuration_modify_defaults(self):
-        import redislite.configuration
         result = redislite.configuration.config(daemonize="no")
         self.assertIn('\ndaemonize no', result)
 
@@ -86,7 +95,6 @@ class TestRedisliteConfiguration(unittest.TestCase):
 
 
     def test_configuration_settings(self):
-        import redislite.configuration
         result = redislite.configuration.settings()
         del result['save']  # Save is a list which doesn't work with set
         result_set = set(result.items())
@@ -105,20 +113,34 @@ class TestRedisliteConfiguration(unittest.TestCase):
 
 
     def test_configuration_config_db(self):
-        import redislite.configuration
+        pidfile = os.path.join(self.tempdir, 'test.pid')
+        unixsocket = os.path.join(self.tempdir, 'redis.socket')
         result = redislite.configuration.config(
-                pidfile='/var/run/redislite/test.pid',
-                unixsocket='/var/run/redislite/redis.socket',
-                dbdir=os.getcwd(),
+                pidfile=pidfile,
+                unixsocket= unixsocket,
+                dbdir=self.tempdir,
                 dbfilename='test.db',
         )
 
         self.assertIn('\ndaemonize yes', result)
-        self.assertIn('\npidfile /var/run/redislite/test.pid', result)
+        self.assertIn('\npidfile ' + pidfile, result)
         self.assertIn('\ndbfilename test.db', result)
 
+    def test_configuration_config_db_with_space(self):
+        pidfile = os.path.join(self.tempdir, 'test.pid')
+        unixsocket = os.path.join(self.tempdir, 'redis.socket')
+        result = redislite.configuration.config(
+            pidfile=pidfile,
+            unixsocket=unixsocket,
+            dbdir=self.tempdir,
+            dbfilename='test space.db',
+        )
+
+        self.assertIn('\ndaemonize yes', result)
+        self.assertIn('\npidfile ' + pidfile, result)
+        self.assertIn('\ndbfilename "test space.db"', result)
+
     def test_configuration_config_slave(self):
-        import redislite.configuration
         result = redislite.configuration.config(
                 pidfile='/var/run/redislite/test.pid',
                 unixsocket='/var/run/redislite/redis.socket',

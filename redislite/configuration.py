@@ -88,6 +88,29 @@ def settings(**kwargs):
     return new_settings
 
 
+def config_line(setting, value):
+    """
+    Generate a single configuration line based on the setting and value
+
+    Parameters
+    ----------
+    setting : str
+        The configuration setting
+
+    value : str
+        The value for the configuration setting
+
+    Returns
+    -------
+    str
+        The configuration line based on the setting and value
+    """
+    if setting in ['dbfilename', 'dbdir']:
+        if ' ' in value and '"' not in value:
+            value = '"' + value + '"'
+    return '{setting} {value}'.format(setting=setting, value=value)
+
+
 def config(**kwargs):
     """
     Generate a redis configuration file based on the passed arguments
@@ -109,13 +132,13 @@ def config(**kwargs):
         if config_dict[key]:
             if isinstance(config_dict[key], list):
                 for item in config_dict[key]:
-                    configuration += '{key} {value}\n'.format(
-                        key=key, value=item
-                    )
+                    configuration += config_line(
+                        setting=key, value=item
+                    ) + '\n'
             else:
-                configuration += '{key} {value}\n'.format(
-                    key=key, value=config_dict[key]
-                )
+                configuration += config_line(
+                    setting=key, value=config_dict[key]
+                ) + '\n'
         else:
             del config_dict[key]
     logger.debug('Using configuration: %s', configuration)
