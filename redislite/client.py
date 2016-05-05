@@ -282,6 +282,7 @@ class RedisMixin(object):
         logger.debug('loading settings, found: %s', settings)
         pidfile = settings.get('pidfile', '')
         if os.path.exists(pidfile):
+            # noinspection PyUnusedLocal
             pid_number = 0
             with open(pidfile) as fh:
                 pid_number = int(fh.read())
@@ -289,7 +290,7 @@ class RedisMixin(object):
                 process = psutil.Process(pid_number)
                 if not process.is_running():  # pragma: no cover
                     logger.warn(
-                        'Loaded registry for non-existant redis-server'
+                        'Loaded registry for non-existent redis-server'
                     )
                     return
         else:  # pragma: no cover
@@ -328,6 +329,7 @@ class RedisMixin(object):
         # If the user is specifying settings we can't configure just pass the
         # request to the redis.Redis module
         if 'host' in kwargs.keys() or 'port' in kwargs.keys():
+            # noinspection PyArgumentList
             super(RedisMixin, self).__init__(
                 *args, **kwargs
             )  # pragma: no cover
@@ -386,6 +388,7 @@ class RedisMixin(object):
         kwargs['unix_socket_path'] = self.socket_file
         # noinspection PyArgumentList
         logger.debug('Calling binding with %s, %s', args, kwargs)
+        # noinspection PyArgumentList
         super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
         logger.debug("Pinging the server to ensure we're connected")
@@ -483,6 +486,8 @@ class RedisMixin(object):
             return int(pid)
         return 0  # pragma: no cover
 
+
+# noinspection PyUnresolvedReferences
 class Redis(RedisMixin, redis.Redis):
     """
     This class provides an enhanced version of the :class:`redis.Redis()` class
@@ -568,13 +573,20 @@ class Redis(RedisMixin, redis.Redis):
 
     Attributes
     ----------
-    db : string
+
+    db : str
         The fully qualified filename associated with the redis dbfilename
         configuration setting.  This attribute is read only.
+
+    logfile : str
+        The name of the redis-server logfile
 
     pid :int
         Pid of the running embedded redis server, this attribute is read
         only.
+
+    redis_log : str
+        The contents of the redis-server log file
 
     start_timeout : float
         Number of seconds to wait for the redis-server process to start
@@ -583,6 +595,7 @@ class Redis(RedisMixin, redis.Redis):
     pass
 
 
+# noinspection PyUnresolvedReferences
 class StrictRedis(RedisMixin, redis.StrictRedis):
     """
     This class provides an enhanced version of the :class:`redis.StrictRedis()`
