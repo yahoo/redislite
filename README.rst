@@ -70,23 +70,12 @@ Installing on Mac OSX
 Redislite for OSX comes as a wheel package by default that can be installed
 using current versions of pip.
 
-To install Redislite on MacOSX using the sdist package instead you may need
+To install Redislite on MacOSX using the sdist package instead you will need
 the XCode command line utilities installed.  If you do not have xcode
 installed on recent OSX releases they can be installed by
 running::
 
     xcode-select --install
-
-Note redislite and its dependencies use the gcc compiler. On OSX you may run
-into errors indicating that your machine is using clang to compile instead, for
-example::
-
-    clang: error: unknown argument: '-mno-fused-madd' [-Wunused-command-line-argument-hard-error-in-future]
-
-If this is the case, set your environment variable to override the use of clang
-in favor of gcc::
-
-    CC=gcc
 
 
 Installation

@@ -67,7 +67,7 @@ class RedisMixin(object):
         Stop the redis-server for this instance if it's running
         :return:
         """
-        if sys_modules:
+        if sys_modules:     # pragma: no cover
             import sys
             sys.modules.update(sys_modules)
 
@@ -81,7 +81,7 @@ class RedisMixin(object):
                 )
                 # noinspection PyUnresolvedReferences
                 logger.debug(
-                    'Shutting down redis server with pid of %d', self.pid
+                    'Shutting down redis server with pid of %r', self.pid
                 )
                 self.shutdown()
                 self.socket_file = None
@@ -178,10 +178,7 @@ class RedisMixin(object):
         rc = subprocess.call(command)
         if rc:  # pragma: no cover
             logger.debug('The binary redis-server failed to start')
-            redis_log = os.path.join(self.redis_dir, 'redis.log')
-            if os.path.exists(redis_log):
-                with open(redis_log) as file_handle:
-                    logger.debug(file_handle.read())
+            logger.debug('Redis Server log:\n%s', self.redis_log)
             raise RedisLiteException('The binary redis-server failed to start')
 
         # Wait for Redis to start
@@ -192,11 +189,13 @@ class RedisMixin(object):
                 break
             time.sleep(.1)
         if timeout:  # pragma: no cover
+            logger.debug('Redis Server log:\n%s', self.redis_log)
             raise RedisLiteServerStartError(
                 'The redis-server process failed to start'
             )
 
         if not os.path.exists(self.socket_file):  # pragma: no cover
+            logger.debug('Redis Server log:\n%s', self.redis_log)
             raise RedisLiteException(
                 'Redis socket file %s is not present' % self.socket_file
             )
@@ -283,6 +282,7 @@ class RedisMixin(object):
         logger.debug('loading settings, found: %s', settings)
         pidfile = settings.get('pidfile', '')
         if os.path.exists(pidfile):
+            # noinspection PyUnusedLocal
             pid_number = 0
             with open(pidfile) as fh:
                 pid_number = int(fh.read())
@@ -290,7 +290,7 @@ class RedisMixin(object):
                 process = psutil.Process(pid_number)
                 if not process.is_running():  # pragma: no cover
                     logger.warn(
-                        'Loaded registry for non-existant redis-server'
+                        'Loaded registry for non-existent redis-server'
                     )
                     return
         else:  # pragma: no cover
@@ -329,6 +329,7 @@ class RedisMixin(object):
         # If the user is specifying settings we can't configure just pass the
         # request to the redis.Redis module
         if 'host' in kwargs.keys() or 'port' in kwargs.keys():
+            # noinspection PyArgumentList
             super(RedisMixin, self).__init__(
                 *args, **kwargs
             )  # pragma: no cover
@@ -362,9 +363,9 @@ class RedisMixin(object):
             self.dbfilename = os.path.basename(db_filename)
             self.dbdir = os.path.dirname(db_filename)
 
-            self.settingregistryfile = os.path.join(
+            self.settingregistryfile = repr(os.path.join(
                 self.dbdir, self.dbfilename + '.settings'
-            )
+            )).strip("'")
 
         logger.debug('Setting up redis with rdb file: %s', self.dbfilename)
         logger.debug('Setting up redis with socket file: %s', self.socket_file)
@@ -379,15 +380,15 @@ class RedisMixin(object):
 
             if not self.dbdir:
                 self.dbdir = self.redis_dir
-                self.settingregistryfile = os.path.join(
+                self.settingregistryfile = repr(os.path.join(
                     self.dbdir, self.dbfilename + '.settings'
-                )
-
+                )).strip("'")
             self._start_redis()
 
         kwargs['unix_socket_path'] = self.socket_file
         # noinspection PyArgumentList
         logger.debug('Calling binding with %s, %s', args, kwargs)
+        # noinspection PyArgumentList
         super(RedisMixin, self).__init__(*args, **kwargs)  # pragma: no cover
 
         logger.debug("Pinging the server to ensure we're connected")
@@ -395,6 +396,60 @@ class RedisMixin(object):
 
     def __del__(self):
         self._cleanup()  # pragma: no cover
+
+    def redis_log_tail(self, lines=1, width=80):
+        """
+        The redis log output
+
+
+        Parameters
+        ----------
+        lines : int, optional
+            Number of lines from the end of the logfile to return, a value of
+            0 will return all lines, default=1
+
+        width : int, optional
+            The expected average width of a log file line, this is used to
+            determine the chunksize of the seek operations, default=80
+
+        Returns
+        -------
+        list
+            List of strings containing the lines from the logfile requested
+        """
+        chunksize = lines * width
+
+        if not os.path.exists(self.logfile):
+            return []
+
+        with open(self.logfile) as log_handle:
+            if lines == 0:
+                return [l.strip() for l in log_handle.readlines()]
+            log_handle.seek(0, 2)
+            log_size = log_handle.tell()
+            if log_size == 0:
+                logger.debug('Logfile %r is empty', self.logfile)
+                return []
+            data = []
+            for increment in range(1, int(log_size / chunksize) + 1):
+                seek_location = max(chunksize * increment, 0)
+                log_handle.seek(seek_location, 0)
+                data = log_handle.readlines()
+                if len(data) >= lines:
+                    return [l.strip() for l in data[-lines:]]
+            return [l.strip() for l in data]
+
+    @property
+    def redis_log(self):
+        """
+        Redis server log content as a string
+
+        Returns
+        -------
+        str
+            Log contents
+        """
+        return os.linesep.join(self.redis_log_tail(lines=0))
 
     @property
     def db(self):
@@ -432,6 +487,7 @@ class RedisMixin(object):
         return 0  # pragma: no cover
 
 
+# noinspection PyUnresolvedReferences
 class Redis(RedisMixin, redis.Redis):
     """
     This class provides an enhanced version of the :class:`redis.Redis()` class
@@ -517,13 +573,20 @@ class Redis(RedisMixin, redis.Redis):
 
     Attributes
     ----------
-    db : string
+
+    db : str
         The fully qualified filename associated with the redis dbfilename
         configuration setting.  This attribute is read only.
+
+    logfile : str
+        The name of the redis-server logfile
 
     pid :int
         Pid of the running embedded redis server, this attribute is read
         only.
+
+    redis_log : str
+        The contents of the redis-server log file
 
     start_timeout : float
         Number of seconds to wait for the redis-server process to start
@@ -532,6 +595,7 @@ class Redis(RedisMixin, redis.Redis):
     pass
 
 
+# noinspection PyUnresolvedReferences
 class StrictRedis(RedisMixin, redis.StrictRedis):
     """
     This class provides an enhanced version of the :class:`redis.StrictRedis()`

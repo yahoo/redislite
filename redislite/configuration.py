@@ -16,8 +16,9 @@ DEFAULT_REDIS_SETTINGS = {
     'activerehashing': 'yes',
     'aof-rewrite-incremental-fsync': 'yes',
     'appendonly': 'no',
-    'appendfilename': '"appendonly.aof"',
+    'appendfilename': 'appendonly.aof',
     'appendfsync': 'everysec',
+    'aof-load-truncated': 'yes',
     'auto-aof-rewrite-percentage': '100',
     'auto-aof-rewrite-min-size': '64mb',
     'bind': None,
@@ -25,39 +26,38 @@ DEFAULT_REDIS_SETTINGS = {
     'databases': '16',
     'dbdir': './',
     'dbfilename': 'redis.db',
+    'hash-max-ziplist-entries': '512',
+    'hash-max-ziplist-value': '64',
+    'hll-sparse-max-bytes': '3000',
+    'hz': '10',
+    'list-max-ziplist-entries': '512',
+    'list-max-ziplist-value': '64',
+    'loglevel': 'notice',
+    'logfile' : 'redis.log',
+    'lua-time-limit': '5000',
     'pidfile': '/var/run/redislite/redis.pid',
     'port': '0',
     'save': ['900 1', '300 100', '60 200', '15 1000'],
-    'tcp-backlog': '511',
-    'unixsocket': '/var/run/redislite/redis.socket',
-    'unixsocketperm': '700',
-    'tcp-keepalive': '0',
-    'loglevel': 'notice',
-    'logfile' : 'redis.log',
     'stop-writes-on-bgsave-error': 'yes',
+    'tcp-backlog': '511',
+    'tcp-keepalive': '0',
     'rdbcompression': 'yes',
     'rdbchecksum': 'yes',
-    'timeout': '0',
     'slave-serve-stale-data': 'yes',
     'slave-read-only': 'yes',
     'repl-disable-tcp-nodelay': 'no',
     'slave-priority': '100',
     'no-appendfsync-on-rewrite': 'no',
-    'aof-load-truncated': 'yes',
-    'lua-time-limit': '5000',
     'slowlog-log-slower-than': '10000',
     'slowlog-max-len': '128',
     'latency-monitor-threshold': '0',
     'notify-keyspace-events': '""',
-    'hash-max-ziplist-entries': '512',
-    'hash-max-ziplist-value': '64',
-    'list-max-ziplist-entries': '512',
-    'list-max-ziplist-value': '64',
     'set-max-intset-entries': '512',
+    'timeout': '0',
+    'unixsocket': '/var/run/redislite/redis.socket',
+    'unixsocketperm': '700',
     'zset-max-ziplist-entries': '128',
     'zset-max-ziplist-value': '64',
-    'hll-sparse-max-bytes': '3000',
-    'hz': '10',
 }
 
 
@@ -88,6 +88,30 @@ def settings(**kwargs):
     return new_settings
 
 
+def config_line(setting, value):
+    """
+    Generate a single configuration line based on the setting and value
+
+    Parameters
+    ----------
+    setting : str
+        The configuration setting
+
+    value : str
+        The value for the configuration setting
+
+    Returns
+    -------
+    str
+        The configuration line based on the setting and value
+    """
+    if setting in [
+        'appendfilename', 'dbfilename', 'dbdir', 'dir', 'pidfile', 'unixsocket'
+    ]:
+        value = repr(value)
+    return '{setting} {value}'.format(setting=setting, value=value)
+
+
 def config(**kwargs):
     """
     Generate a redis configuration file based on the passed arguments
@@ -109,13 +133,13 @@ def config(**kwargs):
         if config_dict[key]:
             if isinstance(config_dict[key], list):
                 for item in config_dict[key]:
-                    configuration += '{key} {value}\n'.format(
-                        key=key, value=item
-                    )
+                    configuration += config_line(
+                        setting=key, value=item
+                    ) + '\n'
             else:
-                configuration += '{key} {value}\n'.format(
-                    key=key, value=config_dict[key]
-                )
+                configuration += config_line(
+                    setting=key, value=config_dict[key]
+                ) + '\n'
         else:
             del config_dict[key]
     logger.debug('Using configuration: %s', configuration)
