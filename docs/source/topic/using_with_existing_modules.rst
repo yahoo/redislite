@@ -15,7 +15,7 @@ Celery
 
     # Create a Redis instance using redislite
     REDIS_DB_PATH = os.path.join('/tmp/my_redis.db')
-    rdb = Redis(RDB_PATH)
+    rdb = Redis(REDIS_DB_PATH)
     REDIS_SOCKET_PATH = 'redis+socket://%s' % (rdb.socket_file, )
 
     # Use redislite for the Celery broker
