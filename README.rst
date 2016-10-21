@@ -87,12 +87,6 @@ To install redislite, simply:
 
     $ pip install redislite
 
-or using easy_install:
-
-.. code-block::
-
-    $ easy_install redislite
-
 or from source:
 
 .. code-block::
