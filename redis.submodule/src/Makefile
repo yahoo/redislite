@@ -15,10 +15,10 @@
 release_hdr := $(shell sh -c './mkreleasehdr.sh')
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 OPTIMIZATION?=-O2
-DEPENDENCY_TARGETS=hiredis linenoise lua
+DEPENDENCY_TARGETS=hiredis linenoise lua geohash-int
 
 # Default settings
-STD=-std=c99 -pedantic
+STD=-std=c99 -pedantic -DREDIS_STATIC=''
 WARN=-Wall -W
 OPT=$(OPTIMIZATION)
 
@@ -46,10 +46,14 @@ ifeq ($(USE_JEMALLOC),yes)
 	MALLOC=jemalloc
 endif
 
+ifeq ($(USE_JEMALLOC),no)
+	MALLOC=libc
+endif
+
 # Override default settings if possible
 -include .make-settings
 
-FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS)
+FINAL_CFLAGS=$(STD) $(WARN) $(OPT) $(DEBUG) $(CFLAGS) $(REDIS_CFLAGS) -I../deps/geohash-int
 FINAL_LDFLAGS=$(LDFLAGS) $(REDIS_LDFLAGS) $(DEBUG)
 FINAL_LIBS=-lm
 DEBUG=-g -ggdb
@@ -61,17 +65,27 @@ ifeq ($(uname_S),SunOS)
 	FINAL_LIBS+= -ldl -lnsl -lsocket -lresolv -lpthread -lrt
 else
 ifeq ($(uname_S),Darwin)
-	# Darwin (nothing to do)
+	# Darwin
+	FINAL_LIBS+= -ldl
 else
 ifeq ($(uname_S),AIX)
         # AIX
         FINAL_LDFLAGS+= -Wl,-bexpall
-        FINAL_LIBS+= -pthread -lcrypt -lbsd
-
+        FINAL_LIBS+=-ldl -pthread -lcrypt -lbsd
+else
+ifeq ($(uname_S),OpenBSD)
+	# OpenBSD
+	FINAL_LIBS+= -lpthread
+else
+ifeq ($(uname_S),FreeBSD)
+	# FreeBSD
+	FINAL_LIBS+= -lpthread
 else
 	# All the other OSes (notably Linux)
 	FINAL_LDFLAGS+= -rdynamic
-	FINAL_LIBS+= -pthread
+	FINAL_LIBS+=-ldl -pthread
+endif
+endif
 endif
 endif
 endif
@@ -91,7 +105,7 @@ endif
 ifeq ($(MALLOC),jemalloc)
 	DEPENDENCY_TARGETS+= jemalloc
 	FINAL_CFLAGS+= -DUSE_JEMALLOC -I../deps/jemalloc/include
-	FINAL_LIBS+= ../deps/jemalloc/lib/libjemalloc.a -ldl
+	FINAL_LIBS+= ../deps/jemalloc/lib/libjemalloc.a
 endif
 
 REDIS_CC=$(QUIET_CC)$(CC) $(FINAL_CFLAGS)
@@ -113,17 +127,17 @@ endif
 
 REDIS_SERVER_NAME=redis-server
 REDIS_SENTINEL_NAME=redis-sentinel
-REDIS_SERVER_OBJ=adlist.o ae.o anet.o dict.o redis.o sds.o zmalloc.o lzf_c.o lzf_d.o pqsort.o zipmap.o sha1.o ziplist.o release.o networking.o util.o object.o db.o replication.o rdb.o t_string.o t_list.o t_set.o t_zset.o t_hash.o config.o aof.o pubsub.o multi.o debug.o sort.o intset.o syncio.o cluster.o crc16.o endianconv.o slowlog.o scripting.o bio.o rio.o rand.o memtest.o crc64.o bitops.o sentinel.o notify.o setproctitle.o blocked.o hyperloglog.o latency.o sparkline.o
+REDIS_SERVER_OBJ=adlist.o quicklist.o ae.o anet.o dict.o server.o sds.o zmalloc.o lzf_c.o lzf_d.o pqsort.o zipmap.o sha1.o ziplist.o release.o networking.o util.o object.o db.o replication.o rdb.o t_string.o t_list.o t_set.o t_zset.o t_hash.o config.o aof.o pubsub.o multi.o debug.o sort.o intset.o syncio.o cluster.o crc16.o endianconv.o slowlog.o scripting.o bio.o rio.o rand.o memtest.o crc64.o bitops.o sentinel.o notify.o setproctitle.o blocked.o hyperloglog.o latency.o sparkline.o redis-check-rdb.o geo.o
+REDIS_GEOHASH_OBJ=../deps/geohash-int/geohash.o ../deps/geohash-int/geohash_helper.o
 REDIS_CLI_NAME=redis-cli
-REDIS_CLI_OBJ=anet.o sds.o adlist.o redis-cli.o zmalloc.o release.o anet.o ae.o crc64.o
+REDIS_CLI_OBJ=anet.o adlist.o redis-cli.o zmalloc.o release.o anet.o ae.o crc64.o
 REDIS_BENCHMARK_NAME=redis-benchmark
-REDIS_BENCHMARK_OBJ=ae.o anet.o redis-benchmark.o sds.o adlist.o zmalloc.o redis-benchmark.o
-REDIS_CHECK_DUMP_NAME=redis-check-dump
-REDIS_CHECK_DUMP_OBJ=redis-check-dump.o lzf_c.o lzf_d.o crc64.o
+REDIS_BENCHMARK_OBJ=ae.o anet.o redis-benchmark.o adlist.o zmalloc.o redis-benchmark.o
+REDIS_CHECK_RDB_NAME=redis-check-rdb
 REDIS_CHECK_AOF_NAME=redis-check-aof
 REDIS_CHECK_AOF_OBJ=redis-check-aof.o
 
-all: $(REDIS_SERVER_NAME) $(REDIS_SENTINEL_NAME) $(REDIS_CLI_NAME) $(REDIS_BENCHMARK_NAME) $(REDIS_CHECK_DUMP_NAME) $(REDIS_CHECK_AOF_NAME)
+all: $(REDIS_SERVER_NAME) $(REDIS_SENTINEL_NAME) $(REDIS_CLI_NAME) $(REDIS_BENCHMARK_NAME) $(REDIS_CHECK_RDB_NAME) $(REDIS_CHECK_AOF_NAME)
 	@echo ""
 	@echo "Hint: It's a good idea to run 'make test' ;)"
 	@echo ""
@@ -168,11 +182,15 @@ endif
 
 # redis-server
 $(REDIS_SERVER_NAME): $(REDIS_SERVER_OBJ)
-	$(REDIS_LD) -o $@ $^ ../deps/hiredis/libhiredis.a ../deps/lua/src/liblua.a $(FINAL_LIBS)
+	$(REDIS_LD) -o $@ $^ ../deps/hiredis/libhiredis.a ../deps/lua/src/liblua.a $(REDIS_GEOHASH_OBJ) $(FINAL_LIBS)
 
 # redis-sentinel
 $(REDIS_SENTINEL_NAME): $(REDIS_SERVER_NAME)
 	$(REDIS_INSTALL) $(REDIS_SERVER_NAME) $(REDIS_SENTINEL_NAME)
+
+# redis-check-rdb
+$(REDIS_CHECK_RDB_NAME): $(REDIS_SERVER_NAME)
+	$(REDIS_INSTALL) $(REDIS_SERVER_NAME) $(REDIS_CHECK_RDB_NAME)
 
 # redis-cli
 $(REDIS_CLI_NAME): $(REDIS_CLI_OBJ)
@@ -181,10 +199,6 @@ $(REDIS_CLI_NAME): $(REDIS_CLI_OBJ)
 # redis-benchmark
 $(REDIS_BENCHMARK_NAME): $(REDIS_BENCHMARK_OBJ)
 	$(REDIS_LD) -o $@ $^ ../deps/hiredis/libhiredis.a $(FINAL_LIBS)
-
-# redis-check-dump
-$(REDIS_CHECK_DUMP_NAME): $(REDIS_CHECK_DUMP_OBJ)
-	$(REDIS_LD) -o $@ $^ $(FINAL_LIBS)
 
 # redis-check-aof
 $(REDIS_CHECK_AOF_NAME): $(REDIS_CHECK_AOF_OBJ)
@@ -197,7 +211,7 @@ $(REDIS_CHECK_AOF_NAME): $(REDIS_CHECK_AOF_OBJ)
 	$(REDIS_CC) -c $<
 
 clean:
-	rm -rf $(REDIS_SERVER_NAME) $(REDIS_SENTINEL_NAME) $(REDIS_CLI_NAME) $(REDIS_BENCHMARK_NAME) $(REDIS_CHECK_DUMP_NAME) $(REDIS_CHECK_AOF_NAME) *.o *.gcda *.gcno *.gcov redis.info lcov-html
+	rm -rf $(REDIS_SERVER_NAME) $(REDIS_SENTINEL_NAME) $(REDIS_CLI_NAME) $(REDIS_BENCHMARK_NAME) $(REDIS_CHECK_RDB_NAME) $(REDIS_CHECK_AOF_NAME) *.o *.gcda *.gcno *.gcov redis.info lcov-html
 
 .PHONY: clean
 
@@ -220,6 +234,10 @@ lcov:
 	@(set -e; cd ..; ./runtest --clients 1)
 	@geninfo -o redis.info .
 	@genhtml --legend -o lcov-html redis.info
+
+test-sds: sds.c sds.h
+	$(REDIS_CC) sds.c zmalloc.c -DSDS_TEST_MAIN -o /tmp/sds_test
+	/tmp/sds_test
 
 .PHONY: lcov
 
@@ -249,6 +267,6 @@ install: all
 	$(REDIS_INSTALL) $(REDIS_SERVER_NAME) $(INSTALL_BIN)
 	$(REDIS_INSTALL) $(REDIS_BENCHMARK_NAME) $(INSTALL_BIN)
 	$(REDIS_INSTALL) $(REDIS_CLI_NAME) $(INSTALL_BIN)
-	$(REDIS_INSTALL) $(REDIS_CHECK_DUMP_NAME) $(INSTALL_BIN)
+	$(REDIS_INSTALL) $(REDIS_CHECK_RDB_NAME) $(INSTALL_BIN)
 	$(REDIS_INSTALL) $(REDIS_CHECK_AOF_NAME) $(INSTALL_BIN)
 	@ln -sf $(REDIS_SERVER_NAME) $(INSTALL_BIN)/$(REDIS_SENTINEL_NAME)

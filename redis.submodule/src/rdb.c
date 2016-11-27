@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "redis.h"
+#include "server.h"
 #include "lzf.h"    /* LZF compression library */
 #include "zipmap.h"
 #include "endianconv.h"
@@ -39,6 +39,38 @@
 #include <sys/wait.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
+#include <sys/param.h>
+
+#define RDB_LOAD_NONE   0
+#define RDB_LOAD_ENC    (1<<0)
+#define RDB_LOAD_PLAIN  (1<<1)
+
+#define rdbExitReportCorruptRDB(...) rdbCheckThenExit(__LINE__,__VA_ARGS__)
+
+extern int rdbCheckMode;
+void rdbCheckError(const char *fmt, ...);
+void rdbCheckSetError(const char *fmt, ...);
+
+void rdbCheckThenExit(int linenum, char *reason, ...) {
+    va_list ap;
+    char msg[1024];
+    int len;
+
+    len = snprintf(msg,sizeof(msg),
+        "Internal error in RDB reading function at rdb.c:%d -> ", linenum);
+    va_start(ap,reason);
+    vsnprintf(msg+len,sizeof(msg)-len,reason,ap);
+    va_end(ap);
+
+    if (!rdbCheckMode) {
+        serverLog(LL_WARNING, "%s", msg);
+        char *argv[2] = {"",server.rdb_filename};
+        redis_check_rdb_main(2,argv);
+    } else {
+        rdbCheckError("%s",msg);
+    }
+    exit(1);
+}
 
 static int rdbWriteRaw(rio *rdb, void *p, size_t len) {
     if (rdb && rioWrite(rdb,p,len) == 0)
@@ -77,7 +109,7 @@ long long rdbLoadMillisecondTime(rio *rdb) {
 }
 
 /* Saves an encoded length. The first two bits in the first byte are used to
- * hold the encoding type. See the REDIS_RDB_* definitions for more information
+ * hold the encoding type. See the RDB_* definitions for more information
  * on the types of encoding. */
 int rdbSaveLen(rio *rdb, uint32_t len) {
     unsigned char buf[2];
@@ -85,18 +117,18 @@ int rdbSaveLen(rio *rdb, uint32_t len) {
 
     if (len < (1<<6)) {
         /* Save a 6 bit len */
-        buf[0] = (len&0xFF)|(REDIS_RDB_6BITLEN<<6);
+        buf[0] = (len&0xFF)|(RDB_6BITLEN<<6);
         if (rdbWriteRaw(rdb,buf,1) == -1) return -1;
         nwritten = 1;
     } else if (len < (1<<14)) {
         /* Save a 14 bit len */
-        buf[0] = ((len>>8)&0xFF)|(REDIS_RDB_14BITLEN<<6);
+        buf[0] = ((len>>8)&0xFF)|(RDB_14BITLEN<<6);
         buf[1] = len&0xFF;
         if (rdbWriteRaw(rdb,buf,2) == -1) return -1;
         nwritten = 2;
     } else {
         /* Save a 32 bit len */
-        buf[0] = (REDIS_RDB_32BITLEN<<6);
+        buf[0] = (RDB_32BITLEN<<6);
         if (rdbWriteRaw(rdb,buf,1) == -1) return -1;
         len = htonl(len);
         if (rdbWriteRaw(rdb,&len,4) == -1) return -1;
@@ -106,7 +138,7 @@ int rdbSaveLen(rio *rdb, uint32_t len) {
 }
 
 /* Load an encoded length. The "isencoded" argument is set to 1 if the length
- * is not actually a length but an "encoding type". See the REDIS_RDB_ENC_*
+ * is not actually a length but an "encoding type". See the RDB_ENC_*
  * definitions in rdb.h for more information. */
 uint32_t rdbLoadLen(rio *rdb, int *isencoded) {
     unsigned char buf[2];
@@ -114,23 +146,27 @@ uint32_t rdbLoadLen(rio *rdb, int *isencoded) {
     int type;
 
     if (isencoded) *isencoded = 0;
-    if (rioRead(rdb,buf,1) == 0) return REDIS_RDB_LENERR;
+    if (rioRead(rdb,buf,1) == 0) return RDB_LENERR;
     type = (buf[0]&0xC0)>>6;
-    if (type == REDIS_RDB_ENCVAL) {
+    if (type == RDB_ENCVAL) {
         /* Read a 6 bit encoding type. */
         if (isencoded) *isencoded = 1;
         return buf[0]&0x3F;
-    } else if (type == REDIS_RDB_6BITLEN) {
+    } else if (type == RDB_6BITLEN) {
         /* Read a 6 bit len. */
         return buf[0]&0x3F;
-    } else if (type == REDIS_RDB_14BITLEN) {
+    } else if (type == RDB_14BITLEN) {
         /* Read a 14 bit len. */
-        if (rioRead(rdb,buf+1,1) == 0) return REDIS_RDB_LENERR;
+        if (rioRead(rdb,buf+1,1) == 0) return RDB_LENERR;
         return ((buf[0]&0x3F)<<8)|buf[1];
-    } else {
+    } else if (type == RDB_32BITLEN) {
         /* Read a 32 bit len. */
-        if (rioRead(rdb,&len,4) == 0) return REDIS_RDB_LENERR;
+        if (rioRead(rdb,&len,4) == 0) return RDB_LENERR;
         return ntohl(len);
+    } else {
+        rdbExitReportCorruptRDB(
+            "Unknown length encoding %d in rdbLoadLen()",type);
+        return -1; /* Never reached. */
     }
 }
 
@@ -140,16 +176,16 @@ uint32_t rdbLoadLen(rio *rdb, int *isencoded) {
  * length is returned. Otherwise 0 is returned. */
 int rdbEncodeInteger(long long value, unsigned char *enc) {
     if (value >= -(1<<7) && value <= (1<<7)-1) {
-        enc[0] = (REDIS_RDB_ENCVAL<<6)|REDIS_RDB_ENC_INT8;
+        enc[0] = (RDB_ENCVAL<<6)|RDB_ENC_INT8;
         enc[1] = value&0xFF;
         return 2;
     } else if (value >= -(1<<15) && value <= (1<<15)-1) {
-        enc[0] = (REDIS_RDB_ENCVAL<<6)|REDIS_RDB_ENC_INT16;
+        enc[0] = (RDB_ENCVAL<<6)|RDB_ENC_INT16;
         enc[1] = value&0xFF;
         enc[2] = (value>>8)&0xFF;
         return 3;
     } else if (value >= -((long long)1<<31) && value <= ((long long)1<<31)-1) {
-        enc[0] = (REDIS_RDB_ENCVAL<<6)|REDIS_RDB_ENC_INT32;
+        enc[0] = (RDB_ENCVAL<<6)|RDB_ENC_INT32;
         enc[1] = value&0xFF;
         enc[2] = (value>>8)&0xFF;
         enc[3] = (value>>16)&0xFF;
@@ -161,33 +197,42 @@ int rdbEncodeInteger(long long value, unsigned char *enc) {
 }
 
 /* Loads an integer-encoded object with the specified encoding type "enctype".
- * If the "encode" argument is set the function may return an integer-encoded
- * string object, otherwise it always returns a raw string object. */
-robj *rdbLoadIntegerObject(rio *rdb, int enctype, int encode) {
+ * The returned value changes according to the flags, see
+ * rdbGenerincLoadStringObject() for more info. */
+void *rdbLoadIntegerObject(rio *rdb, int enctype, int flags) {
+    int plain = flags & RDB_LOAD_PLAIN;
+    int encode = flags & RDB_LOAD_ENC;
     unsigned char enc[4];
     long long val;
 
-    if (enctype == REDIS_RDB_ENC_INT8) {
+    if (enctype == RDB_ENC_INT8) {
         if (rioRead(rdb,enc,1) == 0) return NULL;
         val = (signed char)enc[0];
-    } else if (enctype == REDIS_RDB_ENC_INT16) {
+    } else if (enctype == RDB_ENC_INT16) {
         uint16_t v;
         if (rioRead(rdb,enc,2) == 0) return NULL;
         v = enc[0]|(enc[1]<<8);
         val = (int16_t)v;
-    } else if (enctype == REDIS_RDB_ENC_INT32) {
+    } else if (enctype == RDB_ENC_INT32) {
         uint32_t v;
         if (rioRead(rdb,enc,4) == 0) return NULL;
         v = enc[0]|(enc[1]<<8)|(enc[2]<<16)|(enc[3]<<24);
         val = (int32_t)v;
     } else {
         val = 0; /* anti-warning */
-        redisPanic("Unknown RDB integer encoding type");
+        rdbExitReportCorruptRDB("Unknown RDB integer encoding type %d",enctype);
     }
-    if (encode)
+    if (plain) {
+        char buf[LONG_STR_SIZE], *p;
+        int len = ll2string(buf,sizeof(buf),val);
+        p = zmalloc(len);
+        memcpy(p,buf,len);
+        return p;
+    } else if (encode) {
         return createStringObjectFromLongLong(val);
-    else
-        return createObject(REDIS_STRING,sdsfromlonglong(val));
+    } else {
+        return createObject(OBJ_STRING,sdsfromlonglong(val));
+    }
 }
 
 /* String objects in the form "2391" "-100" without any space and with a
@@ -209,10 +254,33 @@ int rdbTryIntegerEncoding(char *s, size_t len, unsigned char *enc) {
     return rdbEncodeInteger(value,enc);
 }
 
-int rdbSaveLzfStringObject(rio *rdb, unsigned char *s, size_t len) {
-    size_t comprlen, outlen;
+ssize_t rdbSaveLzfBlob(rio *rdb, void *data, size_t compress_len,
+                       size_t original_len) {
     unsigned char byte;
-    int n, nwritten = 0;
+    ssize_t n, nwritten = 0;
+
+    /* Data compressed! Let's save it on disk */
+    byte = (RDB_ENCVAL<<6)|RDB_ENC_LZF;
+    if ((n = rdbWriteRaw(rdb,&byte,1)) == -1) goto writeerr;
+    nwritten += n;
+
+    if ((n = rdbSaveLen(rdb,compress_len)) == -1) goto writeerr;
+    nwritten += n;
+
+    if ((n = rdbSaveLen(rdb,original_len)) == -1) goto writeerr;
+    nwritten += n;
+
+    if ((n = rdbWriteRaw(rdb,data,compress_len)) == -1) goto writeerr;
+    nwritten += n;
+
+    return nwritten;
+
+writeerr:
+    return -1;
+}
+
+ssize_t rdbSaveLzfStringObject(rio *rdb, unsigned char *s, size_t len) {
+    size_t comprlen, outlen;
     void *out;
 
     /* We require at least four bytes compression for this to be worth it */
@@ -224,52 +292,57 @@ int rdbSaveLzfStringObject(rio *rdb, unsigned char *s, size_t len) {
         zfree(out);
         return 0;
     }
-    /* Data compressed! Let's save it on disk */
-    byte = (REDIS_RDB_ENCVAL<<6)|REDIS_RDB_ENC_LZF;
-    if ((n = rdbWriteRaw(rdb,&byte,1)) == -1) goto writeerr;
-    nwritten += n;
-
-    if ((n = rdbSaveLen(rdb,comprlen)) == -1) goto writeerr;
-    nwritten += n;
-
-    if ((n = rdbSaveLen(rdb,len)) == -1) goto writeerr;
-    nwritten += n;
-
-    if ((n = rdbWriteRaw(rdb,out,comprlen)) == -1) goto writeerr;
-    nwritten += n;
-
+    ssize_t nwritten = rdbSaveLzfBlob(rdb, out, comprlen, len);
     zfree(out);
     return nwritten;
-
-writeerr:
-    zfree(out);
-    return -1;
 }
 
-robj *rdbLoadLzfStringObject(rio *rdb) {
+/* Load an LZF compressed string in RDB format. The returned value
+ * changes according to 'flags'. For more info check the
+ * rdbGenericLoadStringObject() function. */
+void *rdbLoadLzfStringObject(rio *rdb, int flags) {
+    int plain = flags & RDB_LOAD_PLAIN;
     unsigned int len, clen;
     unsigned char *c = NULL;
     sds val = NULL;
 
-    if ((clen = rdbLoadLen(rdb,NULL)) == REDIS_RDB_LENERR) return NULL;
-    if ((len = rdbLoadLen(rdb,NULL)) == REDIS_RDB_LENERR) return NULL;
+    if ((clen = rdbLoadLen(rdb,NULL)) == RDB_LENERR) return NULL;
+    if ((len = rdbLoadLen(rdb,NULL)) == RDB_LENERR) return NULL;
     if ((c = zmalloc(clen)) == NULL) goto err;
-    if ((val = sdsnewlen(NULL,len)) == NULL) goto err;
+
+    /* Allocate our target according to the uncompressed size. */
+    if (plain) {
+        val = zmalloc(len);
+    } else {
+        if ((val = sdsnewlen(NULL,len)) == NULL) goto err;
+    }
+
+    /* Load the compressed representation and uncompress it to target. */
     if (rioRead(rdb,c,clen) == 0) goto err;
-    if (lzf_decompress(c,clen,val,len) == 0) goto err;
+    if (lzf_decompress(c,clen,val,len) == 0) {
+        if (rdbCheckMode) rdbCheckSetError("Invalid LZF compressed string");
+        goto err;
+    }
     zfree(c);
-    return createObject(REDIS_STRING,val);
+
+    if (plain)
+        return val;
+    else
+        return createObject(OBJ_STRING,val);
 err:
     zfree(c);
-    sdsfree(val);
+    if (plain)
+        zfree(val);
+    else
+        sdsfree(val);
     return NULL;
 }
 
 /* Save a string object as [len][data] on disk. If the object is a string
  * representation of an integer value we try to save it in a special form */
-int rdbSaveRawString(rio *rdb, unsigned char *s, size_t len) {
+ssize_t rdbSaveRawString(rio *rdb, unsigned char *s, size_t len) {
     int enclen;
-    int n, nwritten = 0;
+    ssize_t n, nwritten = 0;
 
     /* Try integer encoding */
     if (len <= 11) {
@@ -300,16 +373,16 @@ int rdbSaveRawString(rio *rdb, unsigned char *s, size_t len) {
 }
 
 /* Save a long long value as either an encoded string or a string. */
-int rdbSaveLongLongAsStringObject(rio *rdb, long long value) {
+ssize_t rdbSaveLongLongAsStringObject(rio *rdb, long long value) {
     unsigned char buf[32];
-    int n, nwritten = 0;
+    ssize_t n, nwritten = 0;
     int enclen = rdbEncodeInteger(value,buf);
     if (enclen > 0) {
         return rdbWriteRaw(rdb,buf,enclen);
     } else {
         /* Encode as string */
         enclen = ll2string((char*)buf,32,value);
-        redisAssert(enclen < 32);
+        serverAssert(enclen < 32);
         if ((n = rdbSaveLen(rdb,enclen)) == -1) return -1;
         nwritten += n;
         if ((n = rdbWriteRaw(rdb,buf,enclen)) == -1) return -1;
@@ -322,49 +395,70 @@ int rdbSaveLongLongAsStringObject(rio *rdb, long long value) {
 int rdbSaveStringObject(rio *rdb, robj *obj) {
     /* Avoid to decode the object, then encode it again, if the
      * object is already integer encoded. */
-    if (obj->encoding == REDIS_ENCODING_INT) {
+    if (obj->encoding == OBJ_ENCODING_INT) {
         return rdbSaveLongLongAsStringObject(rdb,(long)obj->ptr);
     } else {
-        redisAssertWithInfo(NULL,obj,sdsEncodedObject(obj));
+        serverAssertWithInfo(NULL,obj,sdsEncodedObject(obj));
         return rdbSaveRawString(rdb,obj->ptr,sdslen(obj->ptr));
     }
 }
 
-robj *rdbGenericLoadStringObject(rio *rdb, int encode) {
+/* Load a string object from an RDB file according to flags:
+ *
+ * RDB_LOAD_NONE (no flags): load an RDB object, unencoded.
+ * RDB_LOAD_ENC: If the returned type is a Redis object, try to
+ *               encode it in a special way to be more memory
+ *               efficient. When this flag is passed the function
+ *               no longer guarantees that obj->ptr is an SDS string.
+ * RDB_LOAD_PLAIN: Return a plain string allocated with zmalloc()
+ *                 instead of a Redis object with an sds in it.
+ * RDB_LOAD_SDS: Return an SDS string instead of a Redis object.
+ */
+void *rdbGenericLoadStringObject(rio *rdb, int flags) {
+    int encode = flags & RDB_LOAD_ENC;
+    int plain = flags & RDB_LOAD_PLAIN;
     int isencoded;
     uint32_t len;
-    robj *o;
 
     len = rdbLoadLen(rdb,&isencoded);
     if (isencoded) {
         switch(len) {
-        case REDIS_RDB_ENC_INT8:
-        case REDIS_RDB_ENC_INT16:
-        case REDIS_RDB_ENC_INT32:
-            return rdbLoadIntegerObject(rdb,len,encode);
-        case REDIS_RDB_ENC_LZF:
-            return rdbLoadLzfStringObject(rdb);
+        case RDB_ENC_INT8:
+        case RDB_ENC_INT16:
+        case RDB_ENC_INT32:
+            return rdbLoadIntegerObject(rdb,len,flags);
+        case RDB_ENC_LZF:
+            return rdbLoadLzfStringObject(rdb,flags);
         default:
-            redisPanic("Unknown RDB encoding type");
+            rdbExitReportCorruptRDB("Unknown RDB string encoding type %d",len);
         }
     }
 
-    if (len == REDIS_RDB_LENERR) return NULL;
-    o = encode ? createStringObject(NULL,len) :
-                 createRawStringObject(NULL,len);
-    if (len && rioRead(rdb,o->ptr,len) == 0) {
-        decrRefCount(o);
-        return NULL;
+    if (len == RDB_LENERR) return NULL;
+    if (!plain) {
+        robj *o = encode ? createStringObject(NULL,len) :
+                           createRawStringObject(NULL,len);
+        if (len && rioRead(rdb,o->ptr,len) == 0) {
+            decrRefCount(o);
+            return NULL;
+        }
+        return o;
+    } else {
+        void *buf = zmalloc(len);
+        if (len && rioRead(rdb,buf,len) == 0) {
+            zfree(buf);
+            return NULL;
+        }
+        return buf;
     }
-    return o;
 }
 
 robj *rdbLoadStringObject(rio *rdb) {
-    return rdbGenericLoadStringObject(rdb,0);
+    return rdbGenericLoadStringObject(rdb,RDB_LOAD_NONE);
 }
 
 robj *rdbLoadEncodedStringObject(rio *rdb) {
-    return rdbGenericLoadStringObject(rdb,1);
+    return rdbGenericLoadStringObject(rdb,RDB_LOAD_ENC);
 }
 
 /* Save a double value. Doubles are saved as strings prefixed by an unsigned
@@ -430,38 +524,36 @@ int rdbLoadDoubleValue(rio *rdb, double *val) {
 /* Save the object type of object "o". */
 int rdbSaveObjectType(rio *rdb, robj *o) {
     switch (o->type) {
-    case REDIS_STRING:
-        return rdbSaveType(rdb,REDIS_RDB_TYPE_STRING);
-    case REDIS_LIST:
-        if (o->encoding == REDIS_ENCODING_ZIPLIST)
-            return rdbSaveType(rdb,REDIS_RDB_TYPE_LIST_ZIPLIST);
-        else if (o->encoding == REDIS_ENCODING_LINKEDLIST)
-            return rdbSaveType(rdb,REDIS_RDB_TYPE_LIST);
+    case OBJ_STRING:
+        return rdbSaveType(rdb,RDB_TYPE_STRING);
+    case OBJ_LIST:
+        if (o->encoding == OBJ_ENCODING_QUICKLIST)
+            return rdbSaveType(rdb,RDB_TYPE_LIST_QUICKLIST);
         else
-            redisPanic("Unknown list encoding");
-    case REDIS_SET:
-        if (o->encoding == REDIS_ENCODING_INTSET)
-            return rdbSaveType(rdb,REDIS_RDB_TYPE_SET_INTSET);
-        else if (o->encoding == REDIS_ENCODING_HT)
-            return rdbSaveType(rdb,REDIS_RDB_TYPE_SET);
+            serverPanic("Unknown list encoding");
+    case OBJ_SET:
+        if (o->encoding == OBJ_ENCODING_INTSET)
+            return rdbSaveType(rdb,RDB_TYPE_SET_INTSET);
+        else if (o->encoding == OBJ_ENCODING_HT)
+            return rdbSaveType(rdb,RDB_TYPE_SET);
         else
-            redisPanic("Unknown set encoding");
-    case REDIS_ZSET:
-        if (o->encoding == REDIS_ENCODING_ZIPLIST)
-            return rdbSaveType(rdb,REDIS_RDB_TYPE_ZSET_ZIPLIST);
-        else if (o->encoding == REDIS_ENCODING_SKIPLIST)
-            return rdbSaveType(rdb,REDIS_RDB_TYPE_ZSET);
+            serverPanic("Unknown set encoding");
+    case OBJ_ZSET:
+        if (o->encoding == OBJ_ENCODING_ZIPLIST)
+            return rdbSaveType(rdb,RDB_TYPE_ZSET_ZIPLIST);
+        else if (o->encoding == OBJ_ENCODING_SKIPLIST)
+            return rdbSaveType(rdb,RDB_TYPE_ZSET);
         else
-            redisPanic("Unknown sorted set encoding");
-    case REDIS_HASH:
-        if (o->encoding == REDIS_ENCODING_ZIPLIST)
-            return rdbSaveType(rdb,REDIS_RDB_TYPE_HASH_ZIPLIST);
-        else if (o->encoding == REDIS_ENCODING_HT)
-            return rdbSaveType(rdb,REDIS_RDB_TYPE_HASH);
+            serverPanic("Unknown sorted set encoding");
+    case OBJ_HASH:
+        if (o->encoding == OBJ_ENCODING_ZIPLIST)
+            return rdbSaveType(rdb,RDB_TYPE_HASH_ZIPLIST);
+        else if (o->encoding == OBJ_ENCODING_HT)
+            return rdbSaveType(rdb,RDB_TYPE_HASH);
         else
-            redisPanic("Unknown hash encoding");
+            serverPanic("Unknown hash encoding");
     default:
-        redisPanic("Unknown object type");
+        serverPanic("Unknown object type");
     }
     return -1; /* avoid warning */
 }
@@ -476,40 +568,39 @@ int rdbLoadObjectType(rio *rdb) {
 }
 
 /* Save a Redis object. Returns -1 on error, number of bytes written on success. */
-int rdbSaveObject(rio *rdb, robj *o) {
-    int n, nwritten = 0;
+ssize_t rdbSaveObject(rio *rdb, robj *o) {
+    ssize_t n = 0, nwritten = 0;
 
-    if (o->type == REDIS_STRING) {
+    if (o->type == OBJ_STRING) {
         /* Save a string value */
         if ((n = rdbSaveStringObject(rdb,o)) == -1) return -1;
         nwritten += n;
-    } else if (o->type == REDIS_LIST) {
+    } else if (o->type == OBJ_LIST) {
         /* Save a list value */
-        if (o->encoding == REDIS_ENCODING_ZIPLIST) {
-            size_t l = ziplistBlobLen((unsigned char*)o->ptr);
+        if (o->encoding == OBJ_ENCODING_QUICKLIST) {
+            quicklist *ql = o->ptr;
+            quicklistNode *node = ql->head;
 
-            if ((n = rdbSaveRawString(rdb,o->ptr,l)) == -1) return -1;
-            nwritten += n;
-        } else if (o->encoding == REDIS_ENCODING_LINKEDLIST) {
-            list *list = o->ptr;
-            listIter li;
-            listNode *ln;
-
-            if ((n = rdbSaveLen(rdb,listLength(list))) == -1) return -1;
+            if ((n = rdbSaveLen(rdb,ql->len)) == -1) return -1;
             nwritten += n;
 
-            listRewind(list,&li);
-            while((ln = listNext(&li))) {
-                robj *eleobj = listNodeValue(ln);
-                if ((n = rdbSaveStringObject(rdb,eleobj)) == -1) return -1;
-                nwritten += n;
-            }
+            do {
+                if (quicklistNodeIsCompressed(node)) {
+                    void *data;
+                    size_t compress_len = quicklistGetLzf(node, &data);
+                    if ((n = rdbSaveLzfBlob(rdb,data,compress_len,node->sz)) == -1) return -1;
+                    nwritten += n;
+                } else {
+                    if ((n = rdbSaveRawString(rdb,node->zl,node->sz)) == -1) return -1;
+                    nwritten += n;
+                }
+            } while ((node = node->next));
         } else {
-            redisPanic("Unknown list encoding");
+            serverPanic("Unknown list encoding");
         }
-    } else if (o->type == REDIS_SET) {
+    } else if (o->type == OBJ_SET) {
         /* Save a set value */
-        if (o->encoding == REDIS_ENCODING_HT) {
+        if (o->encoding == OBJ_ENCODING_HT) {
             dict *set = o->ptr;
             dictIterator *di = dictGetIterator(set);
             dictEntry *de;
@@ -523,22 +614,22 @@ int rdbSaveObject(rio *rdb, robj *o) {
                 nwritten += n;
             }
             dictReleaseIterator(di);
-        } else if (o->encoding == REDIS_ENCODING_INTSET) {
+        } else if (o->encoding == OBJ_ENCODING_INTSET) {
             size_t l = intsetBlobLen((intset*)o->ptr);
 
             if ((n = rdbSaveRawString(rdb,o->ptr,l)) == -1) return -1;
             nwritten += n;
         } else {
-            redisPanic("Unknown set encoding");
+            serverPanic("Unknown set encoding");
         }
-    } else if (o->type == REDIS_ZSET) {
+    } else if (o->type == OBJ_ZSET) {
         /* Save a sorted set value */
-        if (o->encoding == REDIS_ENCODING_ZIPLIST) {
+        if (o->encoding == OBJ_ENCODING_ZIPLIST) {
             size_t l = ziplistBlobLen((unsigned char*)o->ptr);
 
             if ((n = rdbSaveRawString(rdb,o->ptr,l)) == -1) return -1;
             nwritten += n;
-        } else if (o->encoding == REDIS_ENCODING_SKIPLIST) {
+        } else if (o->encoding == OBJ_ENCODING_SKIPLIST) {
             zset *zs = o->ptr;
             dictIterator *di = dictGetIterator(zs->dict);
             dictEntry *de;
@@ -557,17 +648,17 @@ int rdbSaveObject(rio *rdb, robj *o) {
             }
             dictReleaseIterator(di);
         } else {
-            redisPanic("Unknown sorted set encoding");
+            serverPanic("Unknown sorted set encoding");
         }
-    } else if (o->type == REDIS_HASH) {
+    } else if (o->type == OBJ_HASH) {
         /* Save a hash value */
-        if (o->encoding == REDIS_ENCODING_ZIPLIST) {
+        if (o->encoding == OBJ_ENCODING_ZIPLIST) {
             size_t l = ziplistBlobLen((unsigned char*)o->ptr);
 
             if ((n = rdbSaveRawString(rdb,o->ptr,l)) == -1) return -1;
             nwritten += n;
 
-        } else if (o->encoding == REDIS_ENCODING_HT) {
+        } else if (o->encoding == OBJ_ENCODING_HT) {
             dictIterator *di = dictGetIterator(o->ptr);
             dictEntry *de;
 
@@ -586,11 +677,11 @@ int rdbSaveObject(rio *rdb, robj *o) {
             dictReleaseIterator(di);
 
         } else {
-            redisPanic("Unknown hash encoding");
+            serverPanic("Unknown hash encoding");
         }
 
     } else {
-        redisPanic("Unknown object type");
+        serverPanic("Unknown object type");
     }
     return nwritten;
 }
@@ -599,9 +690,9 @@ int rdbSaveObject(rio *rdb, robj *o) {
  * the rdbSaveObject() function. Currently we use a trick to get
  * this length with very little changes to the code. In the future
  * we could switch to a faster solution. */
-off_t rdbSavedObjectLen(robj *o) {
-    int len = rdbSaveObject(NULL,o);
-    redisAssertWithInfo(NULL,o,len != -1);
+size_t rdbSavedObjectLen(robj *o) {
+    ssize_t len = rdbSaveObject(NULL,o);
+    serverAssertWithInfo(NULL,o,len != -1);
     return len;
 }
 
@@ -616,7 +707,7 @@ int rdbSaveKeyValuePair(rio *rdb, robj *key, robj *val,
     if (expiretime != -1) {
         /* If this key is already expired skip it */
         if (expiretime < now) return 0;
-        if (rdbSaveType(rdb,REDIS_RDB_OPCODE_EXPIRETIME_MS) == -1) return -1;
+        if (rdbSaveType(rdb,RDB_OPCODE_EXPIRETIME_MS) == -1) return -1;
         if (rdbSaveMillisecondTime(rdb,expiretime) == -1) return -1;
     }
 
@@ -627,12 +718,45 @@ int rdbSaveKeyValuePair(rio *rdb, robj *key, robj *val,
     return 1;
 }
 
+/* Save an AUX field. */
+int rdbSaveAuxField(rio *rdb, void *key, size_t keylen, void *val, size_t vallen) {
+    if (rdbSaveType(rdb,RDB_OPCODE_AUX) == -1) return -1;
+    if (rdbSaveRawString(rdb,key,keylen) == -1) return -1;
+    if (rdbSaveRawString(rdb,val,vallen) == -1) return -1;
+    return 1;
+}
+
+/* Wrapper for rdbSaveAuxField() used when key/val length can be obtained
+ * with strlen(). */
+int rdbSaveAuxFieldStrStr(rio *rdb, char *key, char *val) {
+    return rdbSaveAuxField(rdb,key,strlen(key),val,strlen(val));
+}
+
+/* Wrapper for strlen(key) + integer type (up to long long range). */
+int rdbSaveAuxFieldStrInt(rio *rdb, char *key, long long val) {
+    char buf[LONG_STR_SIZE];
+    int vlen = ll2string(buf,sizeof(buf),val);
+    return rdbSaveAuxField(rdb,key,strlen(key),buf,vlen);
+}
+
+/* Save a few default AUX fields with information about the RDB generated. */
+int rdbSaveInfoAuxFields(rio *rdb) {
+    int redis_bits = (sizeof(void*) == 8) ? 64 : 32;
+
+    /* Add a few fields about the state when the RDB was created. */
+    if (rdbSaveAuxFieldStrStr(rdb,"redis-ver",REDIS_VERSION) == -1) return -1;
+    if (rdbSaveAuxFieldStrInt(rdb,"redis-bits",redis_bits) == -1) return -1;
+    if (rdbSaveAuxFieldStrInt(rdb,"ctime",time(NULL)) == -1) return -1;
+    if (rdbSaveAuxFieldStrInt(rdb,"used-mem",zmalloc_used_memory()) == -1) return -1;
+    return 1;
+}
+
 /* Produces a dump of the database in RDB format sending it to the specified
- * Redis I/O channel. On success REDIS_OK is returned, otherwise REDIS_ERR
+ * Redis I/O channel. On success C_OK is returned, otherwise C_ERR
  * is returned and part of the output, or all the output, can be
  * missing because of I/O errors.
  *
- * When the function returns REDIS_ERR and if 'error' is not NULL, the
+ * When the function returns C_ERR and if 'error' is not NULL, the
  * integer pointed by 'error' is set to the value of errno just after the I/O
  * error. */
 int rdbSaveRio(rio *rdb, int *error) {
@@ -645,19 +769,35 @@ int rdbSaveRio(rio *rdb, int *error) {
 
     if (server.rdb_checksum)
         rdb->update_cksum = rioGenericUpdateChecksum;
-    snprintf(magic,sizeof(magic),"REDIS%04d",REDIS_RDB_VERSION);
+    snprintf(magic,sizeof(magic),"REDIS%04d",RDB_VERSION);
     if (rdbWriteRaw(rdb,magic,9) == -1) goto werr;
+    if (rdbSaveInfoAuxFields(rdb) == -1) goto werr;
 
     for (j = 0; j < server.dbnum; j++) {
         redisDb *db = server.db+j;
         dict *d = db->dict;
         if (dictSize(d) == 0) continue;
         di = dictGetSafeIterator(d);
-        if (!di) return REDIS_ERR;
+        if (!di) return C_ERR;
 
         /* Write the SELECT DB opcode */
-        if (rdbSaveType(rdb,REDIS_RDB_OPCODE_SELECTDB) == -1) goto werr;
+        if (rdbSaveType(rdb,RDB_OPCODE_SELECTDB) == -1) goto werr;
         if (rdbSaveLen(rdb,j) == -1) goto werr;
+
+        /* Write the RESIZE DB opcode. We trim the size to UINT32_MAX, which
+         * is currently the largest type we are able to represent in RDB sizes.
+         * However this does not limit the actual size of the DB to load since
+         * these sizes are just hints to resize the hash tables. */
+        uint32_t db_size, expires_size;
+        db_size = (dictSize(db->dict) <= UINT32_MAX) ?
+                                dictSize(db->dict) :
+                                UINT32_MAX;
+        expires_size = (dictSize(db->expires) <= UINT32_MAX) ?
+                                dictSize(db->expires) :
+                                UINT32_MAX;
+        if (rdbSaveType(rdb,RDB_OPCODE_RESIZEDB) == -1) goto werr;
+        if (rdbSaveLen(rdb,db_size) == -1) goto werr;
+        if (rdbSaveLen(rdb,expires_size) == -1) goto werr;
 
         /* Iterate this DB writing every entry */
         while((de = dictNext(di)) != NULL) {
@@ -674,19 +814,19 @@ int rdbSaveRio(rio *rdb, int *error) {
     di = NULL; /* So that we don't release it again on error. */
 
     /* EOF opcode */
-    if (rdbSaveType(rdb,REDIS_RDB_OPCODE_EOF) == -1) goto werr;
+    if (rdbSaveType(rdb,RDB_OPCODE_EOF) == -1) goto werr;
 
     /* CRC64 checksum. It will be zero if checksum computation is disabled, the
      * loading code skips the check in this case. */
     cksum = rdb->cksum;
     memrev64ifbe(&cksum);
     if (rioWrite(rdb,&cksum,8) == 0) goto werr;
-    return REDIS_OK;
+    return C_OK;
 
 werr:
     if (error) *error = errno;
     if (di) dictReleaseIterator(di);
-    return REDIS_ERR;
+    return C_ERR;
 }
 
 /* This is just a wrapper to rdbSaveRio() that additionally adds a prefix
@@ -698,40 +838,46 @@ werr:
  * This way processes receiving the payload can understand when it ends
  * without doing any processing of the content. */
 int rdbSaveRioWithEOFMark(rio *rdb, int *error) {
-    char eofmark[REDIS_EOF_MARK_SIZE];
+    char eofmark[RDB_EOF_MARK_SIZE];
 
-    getRandomHexChars(eofmark,REDIS_EOF_MARK_SIZE);
+    getRandomHexChars(eofmark,RDB_EOF_MARK_SIZE);
     if (error) *error = 0;
     if (rioWrite(rdb,"$EOF:",5) == 0) goto werr;
-    if (rioWrite(rdb,eofmark,REDIS_EOF_MARK_SIZE) == 0) goto werr;
+    if (rioWrite(rdb,eofmark,RDB_EOF_MARK_SIZE) == 0) goto werr;
     if (rioWrite(rdb,"\r\n",2) == 0) goto werr;
-    if (rdbSaveRio(rdb,error) == REDIS_ERR) goto werr;
-    if (rioWrite(rdb,eofmark,REDIS_EOF_MARK_SIZE) == 0) goto werr;
-    return REDIS_OK;
+    if (rdbSaveRio(rdb,error) == C_ERR) goto werr;
+    if (rioWrite(rdb,eofmark,RDB_EOF_MARK_SIZE) == 0) goto werr;
+    return C_OK;
 
 werr: /* Write error. */
     /* Set 'error' only if not already set by rdbSaveRio() call. */
     if (error && *error == 0) *error = errno;
-    return REDIS_ERR;
+    return C_ERR;
 }
 
-/* Save the DB on disk. Return REDIS_ERR on error, REDIS_OK on success. */
+/* Save the DB on disk. Return C_ERR on error, C_OK on success. */
 int rdbSave(char *filename) {
     char tmpfile[256];
+    char cwd[MAXPATHLEN]; /* Current working dir path for error messages. */
     FILE *fp;
     rio rdb;
-    int error;
+    int error = 0;
 
     snprintf(tmpfile,256,"temp-%d.rdb", (int) getpid());
     fp = fopen(tmpfile,"w");
     if (!fp) {
-        redisLog(REDIS_WARNING, "Failed opening .rdb for saving: %s",
+        char *cwdp = getcwd(cwd,MAXPATHLEN);
+        serverLog(LL_WARNING,
+            "Failed opening the RDB file %s (in server root dir %s) "
+            "for saving: %s",
+            filename,
+            cwdp ? cwdp : "unknown",
             strerror(errno));
-        return REDIS_ERR;
+        return C_ERR;
     }
 
     rioInitWithFile(&rdb,fp);
-    if (rdbSaveRio(&rdb,&error) == REDIS_ERR) {
+    if (rdbSaveRio(&rdb,&error) == C_ERR) {
         errno = error;
         goto werr;
     }
@@ -744,28 +890,36 @@ int rdbSave(char *filename) {
     /* Use RENAME to make sure the DB file is changed atomically only
      * if the generate DB file is ok. */
     if (rename(tmpfile,filename) == -1) {
-        redisLog(REDIS_WARNING,"Error moving temp DB file on the final destination: %s", strerror(errno));
+        char *cwdp = getcwd(cwd,MAXPATHLEN);
+        serverLog(LL_WARNING,
+            "Error moving temp DB file %s on the final "
+            "destination %s (in server root dir %s): %s",
+            tmpfile,
+            filename,
+            cwdp ? cwdp : "unknown",
+            strerror(errno));
         unlink(tmpfile);
-        return REDIS_ERR;
+        return C_ERR;
     }
-    redisLog(REDIS_NOTICE,"DB saved on disk");
+
+    serverLog(LL_NOTICE,"DB saved on disk");
     server.dirty = 0;
     server.lastsave = time(NULL);
-    server.lastbgsave_status = REDIS_OK;
-    return REDIS_OK;
+    server.lastbgsave_status = C_OK;
+    return C_OK;
 
 werr:
-    redisLog(REDIS_WARNING,"Write error saving DB on disk: %s", strerror(errno));
+    serverLog(LL_WARNING,"Write error saving DB on disk: %s", strerror(errno));
     fclose(fp);
     unlink(tmpfile);
-    return REDIS_ERR;
+    return C_ERR;
 }
 
 int rdbSaveBackground(char *filename) {
     pid_t childpid;
     long long start;
 
-    if (server.rdb_child_pid != -1) return REDIS_ERR;
+    if (server.aof_child_pid != -1 || server.rdb_child_pid != -1) return C_ERR;
 
     server.dirty_before_bgsave = server.dirty;
     server.lastbgsave_try = time(NULL);
@@ -778,35 +932,35 @@ int rdbSaveBackground(char *filename) {
         closeListeningSockets(0);
         redisSetProcTitle("redis-rdb-bgsave");
         retval = rdbSave(filename);
-        if (retval == REDIS_OK) {
+        if (retval == C_OK) {
             size_t private_dirty = zmalloc_get_private_dirty();
 
             if (private_dirty) {
-                redisLog(REDIS_NOTICE,
+                serverLog(LL_NOTICE,
                     "RDB: %zu MB of memory used by copy-on-write",
                     private_dirty/(1024*1024));
             }
         }
-        exitFromChild((retval == REDIS_OK) ? 0 : 1);
+        exitFromChild((retval == C_OK) ? 0 : 1);
     } else {
         /* Parent */
         server.stat_fork_time = ustime()-start;
         server.stat_fork_rate = (double) zmalloc_used_memory() * 1000000 / server.stat_fork_time / (1024*1024*1024); /* GB per second. */
         latencyAddSampleIfNeeded("fork",server.stat_fork_time/1000);
         if (childpid == -1) {
-            server.lastbgsave_status = REDIS_ERR;
-            redisLog(REDIS_WARNING,"Can't save in background: fork: %s",
+            server.lastbgsave_status = C_ERR;
+            serverLog(LL_WARNING,"Can't save in background: fork: %s",
                 strerror(errno));
-            return REDIS_ERR;
+            return C_ERR;
         }
-        redisLog(REDIS_NOTICE,"Background saving started by pid %d",childpid);
+        serverLog(LL_NOTICE,"Background saving started by pid %d",childpid);
         server.rdb_save_time_start = time(NULL);
         server.rdb_child_pid = childpid;
-        server.rdb_child_type = REDIS_RDB_CHILD_TYPE_DISK;
+        server.rdb_child_type = RDB_CHILD_TYPE_DISK;
         updateDictResizePolicy();
-        return REDIS_OK;
+        return C_OK;
     }
-    return REDIS_OK; /* unreached */
+    return C_OK; /* unreached */
 }
 
 void rdbRemoveTempFile(pid_t childpid) {
@@ -819,49 +973,34 @@ void rdbRemoveTempFile(pid_t childpid) {
 /* Load a Redis object of the specified type from the specified file.
  * On success a newly allocated object is returned, otherwise NULL. */
 robj *rdbLoadObject(int rdbtype, rio *rdb) {
-    robj *o, *ele, *dec;
+    robj *o = NULL, *ele, *dec;
     size_t len;
     unsigned int i;
 
-    if (rdbtype == REDIS_RDB_TYPE_STRING) {
+    if (rdbtype == RDB_TYPE_STRING) {
         /* Read string value */
         if ((o = rdbLoadEncodedStringObject(rdb)) == NULL) return NULL;
         o = tryObjectEncoding(o);
-    } else if (rdbtype == REDIS_RDB_TYPE_LIST) {
+    } else if (rdbtype == RDB_TYPE_LIST) {
         /* Read list value */
-        if ((len = rdbLoadLen(rdb,NULL)) == REDIS_RDB_LENERR) return NULL;
+        if ((len = rdbLoadLen(rdb,NULL)) == RDB_LENERR) return NULL;
 
-        /* Use a real list when there are too many entries */
-        if (len > server.list_max_ziplist_entries) {
-            o = createListObject();
-        } else {
-            o = createZiplistObject();
-        }
+        o = createQuicklistObject();
+        quicklistSetOptions(o->ptr, server.list_max_ziplist_size,
+                            server.list_compress_depth);
 
         /* Load every single element of the list */
         while(len--) {
             if ((ele = rdbLoadEncodedStringObject(rdb)) == NULL) return NULL;
-
-            /* If we are using a ziplist and the value is too big, convert
-             * the object to a real list. */
-            if (o->encoding == REDIS_ENCODING_ZIPLIST &&
-                sdsEncodedObject(ele) &&
-                sdslen(ele->ptr) > server.list_max_ziplist_value)
-                    listTypeConvert(o,REDIS_ENCODING_LINKEDLIST);
-
-            if (o->encoding == REDIS_ENCODING_ZIPLIST) {
-                dec = getDecodedObject(ele);
-                o->ptr = ziplistPush(o->ptr,dec->ptr,sdslen(dec->ptr),REDIS_TAIL);
-                decrRefCount(dec);
-                decrRefCount(ele);
-            } else {
-                ele = tryObjectEncoding(ele);
-                listAddNodeTail(o->ptr,ele);
-            }
+            dec = getDecodedObject(ele);
+            size_t len = sdslen(dec->ptr);
+            quicklistPushTail(o->ptr, dec->ptr, len);
+            decrRefCount(dec);
+            decrRefCount(ele);
         }
-    } else if (rdbtype == REDIS_RDB_TYPE_SET) {
+    } else if (rdbtype == RDB_TYPE_SET) {
         /* Read list/set value */
-        if ((len = rdbLoadLen(rdb,NULL)) == REDIS_RDB_LENERR) return NULL;
+        if ((len = rdbLoadLen(rdb,NULL)) == RDB_LENERR) return NULL;
 
         /* Use a regular set when there are too many entries. */
         if (len > server.set_max_intset_entries) {
@@ -880,31 +1019,31 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
             if ((ele = rdbLoadEncodedStringObject(rdb)) == NULL) return NULL;
             ele = tryObjectEncoding(ele);
 
-            if (o->encoding == REDIS_ENCODING_INTSET) {
+            if (o->encoding == OBJ_ENCODING_INTSET) {
                 /* Fetch integer value from element */
-                if (isObjectRepresentableAsLongLong(ele,&llval) == REDIS_OK) {
+                if (isObjectRepresentableAsLongLong(ele,&llval) == C_OK) {
                     o->ptr = intsetAdd(o->ptr,llval,NULL);
                 } else {
-                    setTypeConvert(o,REDIS_ENCODING_HT);
+                    setTypeConvert(o,OBJ_ENCODING_HT);
                     dictExpand(o->ptr,len);
                 }
             }
 
             /* This will also be called when the set was just converted
              * to a regular hash table encoded set */
-            if (o->encoding == REDIS_ENCODING_HT) {
+            if (o->encoding == OBJ_ENCODING_HT) {
                 dictAdd((dict*)o->ptr,ele,NULL);
             } else {
                 decrRefCount(ele);
             }
         }
-    } else if (rdbtype == REDIS_RDB_TYPE_ZSET) {
+    } else if (rdbtype == RDB_TYPE_ZSET) {
         /* Read list/set value */
         size_t zsetlen;
         size_t maxelelen = 0;
         zset *zs;
 
-        if ((zsetlen = rdbLoadLen(rdb,NULL)) == REDIS_RDB_LENERR) return NULL;
+        if ((zsetlen = rdbLoadLen(rdb,NULL)) == RDB_LENERR) return NULL;
         o = createZsetObject();
         zs = o->ptr;
 
@@ -930,32 +1069,32 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
         /* Convert *after* loading, since sorted sets are not stored ordered. */
         if (zsetLength(o) <= server.zset_max_ziplist_entries &&
             maxelelen <= server.zset_max_ziplist_value)
-                zsetConvert(o,REDIS_ENCODING_ZIPLIST);
-    } else if (rdbtype == REDIS_RDB_TYPE_HASH) {
+                zsetConvert(o,OBJ_ENCODING_ZIPLIST);
+    } else if (rdbtype == RDB_TYPE_HASH) {
         size_t len;
         int ret;
 
         len = rdbLoadLen(rdb, NULL);
-        if (len == REDIS_RDB_LENERR) return NULL;
+        if (len == RDB_LENERR) return NULL;
 
         o = createHashObject();
 
         /* Too many entries? Use a hash table. */
         if (len > server.hash_max_ziplist_entries)
-            hashTypeConvert(o, REDIS_ENCODING_HT);
+            hashTypeConvert(o, OBJ_ENCODING_HT);
 
         /* Load every field and value into the ziplist */
-        while (o->encoding == REDIS_ENCODING_ZIPLIST && len > 0) {
+        while (o->encoding == OBJ_ENCODING_ZIPLIST && len > 0) {
             robj *field, *value;
 
             len--;
             /* Load raw strings */
             field = rdbLoadStringObject(rdb);
             if (field == NULL) return NULL;
-            redisAssert(sdsEncodedObject(field));
+            serverAssert(sdsEncodedObject(field));
             value = rdbLoadStringObject(rdb);
             if (value == NULL) return NULL;
-            redisAssert(sdsEncodedObject(value));
+            serverAssert(sdsEncodedObject(value));
 
             /* Add pair to ziplist */
             o->ptr = ziplistPush(o->ptr, field->ptr, sdslen(field->ptr), ZIPLIST_TAIL);
@@ -966,7 +1105,7 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
             {
                 decrRefCount(field);
                 decrRefCount(value);
-                hashTypeConvert(o, REDIS_ENCODING_HT);
+                hashTypeConvert(o, OBJ_ENCODING_HT);
                 break;
             }
             decrRefCount(field);
@@ -974,7 +1113,7 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
         }
 
         /* Load remaining fields and values into the hash table */
-        while (o->encoding == REDIS_ENCODING_HT && len > 0) {
+        while (o->encoding == OBJ_ENCODING_HT && len > 0) {
             robj *field, *value;
 
             len--;
@@ -989,25 +1128,33 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
 
             /* Add pair to hash table */
             ret = dictAdd((dict*)o->ptr, field, value);
-            redisAssert(ret == DICT_OK);
+            if (ret == DICT_ERR) {
+                rdbExitReportCorruptRDB("Duplicate keys detected");
+            }
         }
 
         /* All pairs should be read by now */
-        redisAssert(len == 0);
+        serverAssert(len == 0);
+    } else if (rdbtype == RDB_TYPE_LIST_QUICKLIST) {
+        if ((len = rdbLoadLen(rdb,NULL)) == RDB_LENERR) return NULL;
+        o = createQuicklistObject();
+        quicklistSetOptions(o->ptr, server.list_max_ziplist_size,
+                            server.list_compress_depth);
 
-    } else if (rdbtype == REDIS_RDB_TYPE_HASH_ZIPMAP  ||
-               rdbtype == REDIS_RDB_TYPE_LIST_ZIPLIST ||
-               rdbtype == REDIS_RDB_TYPE_SET_INTSET   ||
-               rdbtype == REDIS_RDB_TYPE_ZSET_ZIPLIST ||
-               rdbtype == REDIS_RDB_TYPE_HASH_ZIPLIST)
+        while (len--) {
+            unsigned char *zl = rdbGenericLoadStringObject(rdb,RDB_LOAD_PLAIN);
+            if (zl == NULL) return NULL;
+            quicklistAppendZiplist(o->ptr, zl);
+        }
+    } else if (rdbtype == RDB_TYPE_HASH_ZIPMAP  ||
+               rdbtype == RDB_TYPE_LIST_ZIPLIST ||
+               rdbtype == RDB_TYPE_SET_INTSET   ||
+               rdbtype == RDB_TYPE_ZSET_ZIPLIST ||
+               rdbtype == RDB_TYPE_HASH_ZIPLIST)
     {
-        robj *aux = rdbLoadStringObject(rdb);
-
-        if (aux == NULL) return NULL;
-        o = createObject(REDIS_STRING,NULL); /* string is just placeholder */
-        o->ptr = zmalloc(sdslen(aux->ptr));
-        memcpy(o->ptr,aux->ptr,sdslen(aux->ptr));
-        decrRefCount(aux);
+        unsigned char *encoded = rdbGenericLoadStringObject(rdb,RDB_LOAD_PLAIN);
+        if (encoded == NULL) return NULL;
+        o = createObject(OBJ_STRING,encoded); /* Obj type fixed below. */
 
         /* Fix the object encoding, and make sure to convert the encoded
          * data type into the base type if accordingly to the current
@@ -1016,7 +1163,7 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
          * size as this is an O(N) scan. Eventually everything will get
          * converted. */
         switch(rdbtype) {
-            case REDIS_RDB_TYPE_HASH_ZIPMAP:
+            case RDB_TYPE_HASH_ZIPMAP:
                 /* Convert to ziplist encoded hash. This must be deprecated
                  * when loading dumps created by Redis 2.4 gets deprecated. */
                 {
@@ -1035,46 +1182,45 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
 
                     zfree(o->ptr);
                     o->ptr = zl;
-                    o->type = REDIS_HASH;
-                    o->encoding = REDIS_ENCODING_ZIPLIST;
+                    o->type = OBJ_HASH;
+                    o->encoding = OBJ_ENCODING_ZIPLIST;
 
                     if (hashTypeLength(o) > server.hash_max_ziplist_entries ||
                         maxlen > server.hash_max_ziplist_value)
                     {
-                        hashTypeConvert(o, REDIS_ENCODING_HT);
+                        hashTypeConvert(o, OBJ_ENCODING_HT);
                     }
                 }
                 break;
-            case REDIS_RDB_TYPE_LIST_ZIPLIST:
-                o->type = REDIS_LIST;
-                o->encoding = REDIS_ENCODING_ZIPLIST;
-                if (ziplistLen(o->ptr) > server.list_max_ziplist_entries)
-                    listTypeConvert(o,REDIS_ENCODING_LINKEDLIST);
+            case RDB_TYPE_LIST_ZIPLIST:
+                o->type = OBJ_LIST;
+                o->encoding = OBJ_ENCODING_ZIPLIST;
+                listTypeConvert(o,OBJ_ENCODING_QUICKLIST);
                 break;
-            case REDIS_RDB_TYPE_SET_INTSET:
-                o->type = REDIS_SET;
-                o->encoding = REDIS_ENCODING_INTSET;
+            case RDB_TYPE_SET_INTSET:
+                o->type = OBJ_SET;
+                o->encoding = OBJ_ENCODING_INTSET;
                 if (intsetLen(o->ptr) > server.set_max_intset_entries)
-                    setTypeConvert(o,REDIS_ENCODING_HT);
+                    setTypeConvert(o,OBJ_ENCODING_HT);
                 break;
-            case REDIS_RDB_TYPE_ZSET_ZIPLIST:
-                o->type = REDIS_ZSET;
-                o->encoding = REDIS_ENCODING_ZIPLIST;
+            case RDB_TYPE_ZSET_ZIPLIST:
+                o->type = OBJ_ZSET;
+                o->encoding = OBJ_ENCODING_ZIPLIST;
                 if (zsetLength(o) > server.zset_max_ziplist_entries)
-                    zsetConvert(o,REDIS_ENCODING_SKIPLIST);
+                    zsetConvert(o,OBJ_ENCODING_SKIPLIST);
                 break;
-            case REDIS_RDB_TYPE_HASH_ZIPLIST:
-                o->type = REDIS_HASH;
-                o->encoding = REDIS_ENCODING_ZIPLIST;
+            case RDB_TYPE_HASH_ZIPLIST:
+                o->type = OBJ_HASH;
+                o->encoding = OBJ_ENCODING_ZIPLIST;
                 if (hashTypeLength(o) > server.hash_max_ziplist_entries)
-                    hashTypeConvert(o, REDIS_ENCODING_HT);
+                    hashTypeConvert(o, OBJ_ENCODING_HT);
                 break;
             default:
-                redisPanic("Unknown encoding");
+                rdbExitReportCorruptRDB("Unknown RDB encoding type %d",rdbtype);
                 break;
         }
     } else {
-        redisPanic("Unknown object type");
+        rdbExitReportCorruptRDB("Unknown RDB encoding type %d",rdbtype);
     }
     return o;
 }
@@ -1119,7 +1265,7 @@ void rdbLoadProgressCallback(rio *r, const void *buf, size_t len) {
          * our cached time since it is used to create and update the last
          * interaction time with clients and for other important things. */
         updateCachedTime();
-        if (server.masterhost && server.repl_state == REDIS_REPL_TRANSFER)
+        if (server.masterhost && server.repl_state == REPL_STATE_TRANSFER)
             replicationSendNewlineToMaster();
         loadingProgress(r->processed_bytes);
         processEventsWhileBlocked();
@@ -1135,7 +1281,7 @@ int rdbLoad(char *filename) {
     FILE *fp;
     rio rdb;
 
-    if ((fp = fopen(filename,"r")) == NULL) return REDIS_ERR;
+    if ((fp = fopen(filename,"r")) == NULL) return C_ERR;
 
     rioInitWithFile(&rdb,fp);
     rdb.update_cksum = rdbLoadProgressCallback;
@@ -1144,16 +1290,16 @@ int rdbLoad(char *filename) {
     buf[9] = '\0';
     if (memcmp(buf,"REDIS",5) != 0) {
         fclose(fp);
-        redisLog(REDIS_WARNING,"Wrong signature trying to load DB from file");
+        serverLog(LL_WARNING,"Wrong signature trying to load DB from file");
         errno = EINVAL;
-        return REDIS_ERR;
+        return C_ERR;
     }
     rdbver = atoi(buf+5);
-    if (rdbver < 1 || rdbver > REDIS_RDB_VERSION) {
+    if (rdbver < 1 || rdbver > RDB_VERSION) {
         fclose(fp);
-        redisLog(REDIS_WARNING,"Can't handle RDB format version %d",rdbver);
+        serverLog(LL_WARNING,"Can't handle RDB format version %d",rdbver);
         errno = EINVAL;
-        return REDIS_ERR;
+        return C_ERR;
     }
 
     startLoading(fp);
@@ -1163,35 +1309,80 @@ int rdbLoad(char *filename) {
 
         /* Read type. */
         if ((type = rdbLoadType(&rdb)) == -1) goto eoferr;
-        if (type == REDIS_RDB_OPCODE_EXPIRETIME) {
+
+        /* Handle special types. */
+        if (type == RDB_OPCODE_EXPIRETIME) {
+            /* EXPIRETIME: load an expire associated with the next key
+             * to load. Note that after loading an expire we need to
+             * load the actual type, and continue. */
             if ((expiretime = rdbLoadTime(&rdb)) == -1) goto eoferr;
             /* We read the time so we need to read the object type again. */
             if ((type = rdbLoadType(&rdb)) == -1) goto eoferr;
             /* the EXPIRETIME opcode specifies time in seconds, so convert
              * into milliseconds. */
             expiretime *= 1000;
-        } else if (type == REDIS_RDB_OPCODE_EXPIRETIME_MS) {
-            /* Milliseconds precision expire times introduced with RDB
-             * version 3. */
+        } else if (type == RDB_OPCODE_EXPIRETIME_MS) {
+            /* EXPIRETIME_MS: milliseconds precision expire times introduced
+             * with RDB v3. Like EXPIRETIME but no with more precision. */
             if ((expiretime = rdbLoadMillisecondTime(&rdb)) == -1) goto eoferr;
             /* We read the time so we need to read the object type again. */
             if ((type = rdbLoadType(&rdb)) == -1) goto eoferr;
-        }
-
-        if (type == REDIS_RDB_OPCODE_EOF)
+        } else if (type == RDB_OPCODE_EOF) {
+            /* EOF: End of file, exit the main loop. */
             break;
-
-        /* Handle SELECT DB opcode as a special case */
-        if (type == REDIS_RDB_OPCODE_SELECTDB) {
-            if ((dbid = rdbLoadLen(&rdb,NULL)) == REDIS_RDB_LENERR)
+        } else if (type == RDB_OPCODE_SELECTDB) {
+            /* SELECTDB: Select the specified database. */
+            if ((dbid = rdbLoadLen(&rdb,NULL)) == RDB_LENERR)
                 goto eoferr;
             if (dbid >= (unsigned)server.dbnum) {
-                redisLog(REDIS_WARNING,"FATAL: Data file was created with a Redis server configured to handle more than %d databases. Exiting\n", server.dbnum);
+                serverLog(LL_WARNING,
+                    "FATAL: Data file was created with a Redis "
+                    "server configured to handle more than %d "
+                    "databases. Exiting\n", server.dbnum);
                 exit(1);
             }
             db = server.db+dbid;
-            continue;
+            continue; /* Read type again. */
+        } else if (type == RDB_OPCODE_RESIZEDB) {
+            /* RESIZEDB: Hint about the size of the keys in the currently
+             * selected data base, in order to avoid useless rehashing. */
+            uint32_t db_size, expires_size;
+            if ((db_size = rdbLoadLen(&rdb,NULL)) == RDB_LENERR)
+                goto eoferr;
+            if ((expires_size = rdbLoadLen(&rdb,NULL)) == RDB_LENERR)
+                goto eoferr;
+            dictExpand(db->dict,db_size);
+            dictExpand(db->expires,expires_size);
+            continue; /* Read type again. */
+        } else if (type == RDB_OPCODE_AUX) {
+            /* AUX: generic string-string fields. Use to add state to RDB
+             * which is backward compatible. Implementations of RDB loading
+             * are requierd to skip AUX fields they don't understand.
+             *
+             * An AUX field is composed of two strings: key and value. */
+            robj *auxkey, *auxval;
+            if ((auxkey = rdbLoadStringObject(&rdb)) == NULL) goto eoferr;
+            if ((auxval = rdbLoadStringObject(&rdb)) == NULL) goto eoferr;
+
+            if (((char*)auxkey->ptr)[0] == '%') {
+                /* All the fields with a name staring with '%' are considered
+                 * information fields and are logged at startup with a log
+                 * level of NOTICE. */
+                serverLog(LL_NOTICE,"RDB '%s': %s",
+                    (char*)auxkey->ptr,
+                    (char*)auxval->ptr);
+            } else {
+                /* We ignore fields we don't understand, as by AUX field
+                 * contract. */
+                serverLog(LL_DEBUG,"Unrecognized RDB AUX field: '%s'",
+                    (char*)auxkey->ptr);
+            }
+
+            decrRefCount(auxkey);
+            decrRefCount(auxval);
+            continue; /* Read type again. */
         }
+
         /* Read key */
         if ((key = rdbLoadStringObject(&rdb)) == NULL) goto eoferr;
         /* Read value */
@@ -1221,39 +1412,39 @@ int rdbLoad(char *filename) {
         if (rioRead(&rdb,&cksum,8) == 0) goto eoferr;
         memrev64ifbe(&cksum);
         if (cksum == 0) {
-            redisLog(REDIS_WARNING,"RDB file was saved with checksum disabled: no check performed.");
+            serverLog(LL_WARNING,"RDB file was saved with checksum disabled: no check performed.");
         } else if (cksum != expected) {
-            redisLog(REDIS_WARNING,"Wrong RDB checksum. Aborting now.");
-            exit(1);
+            serverLog(LL_WARNING,"Wrong RDB checksum. Aborting now.");
+            rdbExitReportCorruptRDB("RDB CRC error");
         }
     }
 
     fclose(fp);
     stopLoading();
-    return REDIS_OK;
+    return C_OK;
 
 eoferr: /* unexpected end of file is handled here with a fatal exit */
-    redisLog(REDIS_WARNING,"Short read or OOM loading DB. Unrecoverable error, aborting now.");
-    exit(1);
-    return REDIS_ERR; /* Just to avoid warning */
+    serverLog(LL_WARNING,"Short read or OOM loading DB. Unrecoverable error, aborting now.");
+    rdbExitReportCorruptRDB("Unexpected EOF reading RDB file");
+    return C_ERR; /* Just to avoid warning */
 }
 
 /* A background saving child (BGSAVE) terminated its work. Handle this.
  * This function covers the case of actual BGSAVEs. */
 void backgroundSaveDoneHandlerDisk(int exitcode, int bysignal) {
     if (!bysignal && exitcode == 0) {
-        redisLog(REDIS_NOTICE,
+        serverLog(LL_NOTICE,
             "Background saving terminated with success");
         server.dirty = server.dirty - server.dirty_before_bgsave;
         server.lastsave = time(NULL);
-        server.lastbgsave_status = REDIS_OK;
+        server.lastbgsave_status = C_OK;
     } else if (!bysignal && exitcode != 0) {
-        redisLog(REDIS_WARNING, "Background saving error");
-        server.lastbgsave_status = REDIS_ERR;
+        serverLog(LL_WARNING, "Background saving error");
+        server.lastbgsave_status = C_ERR;
     } else {
         mstime_t latency;
 
-        redisLog(REDIS_WARNING,
+        serverLog(LL_WARNING,
             "Background saving terminated by signal %d", bysignal);
         latencyStartMonitor(latency);
         rdbRemoveTempFile(server.rdb_child_pid);
@@ -1262,15 +1453,15 @@ void backgroundSaveDoneHandlerDisk(int exitcode, int bysignal) {
         /* SIGUSR1 is whitelisted, so we have a way to kill a child without
          * tirggering an error conditon. */
         if (bysignal != SIGUSR1)
-            server.lastbgsave_status = REDIS_ERR;
+            server.lastbgsave_status = C_ERR;
     }
     server.rdb_child_pid = -1;
-    server.rdb_child_type = REDIS_RDB_CHILD_TYPE_NONE;
+    server.rdb_child_type = RDB_CHILD_TYPE_NONE;
     server.rdb_save_time_last = time(NULL)-server.rdb_save_time_start;
     server.rdb_save_time_start = -1;
     /* Possibly there are slaves waiting for a BGSAVE in order to be served
      * (the first stage of SYNC is a bulk transfer of dump.rdb) */
-    updateSlavesWaitingBgsave((!bysignal && exitcode == 0) ? REDIS_OK : REDIS_ERR, REDIS_RDB_CHILD_TYPE_DISK);
+    updateSlavesWaitingBgsave((!bysignal && exitcode == 0) ? C_OK : C_ERR, RDB_CHILD_TYPE_DISK);
 }
 
 /* A background saving child (BGSAVE) terminated its work. Handle this.
@@ -1280,16 +1471,16 @@ void backgroundSaveDoneHandlerSocket(int exitcode, int bysignal) {
     uint64_t *ok_slaves;
 
     if (!bysignal && exitcode == 0) {
-        redisLog(REDIS_NOTICE,
+        serverLog(LL_NOTICE,
             "Background RDB transfer terminated with success");
     } else if (!bysignal && exitcode != 0) {
-        redisLog(REDIS_WARNING, "Background transfer error");
+        serverLog(LL_WARNING, "Background transfer error");
     } else {
-        redisLog(REDIS_WARNING,
+        serverLog(LL_WARNING,
             "Background transfer terminated by signal %d", bysignal);
     }
     server.rdb_child_pid = -1;
-    server.rdb_child_type = REDIS_RDB_CHILD_TYPE_NONE;
+    server.rdb_child_type = RDB_CHILD_TYPE_NONE;
     server.rdb_save_time_start = -1;
 
     /* If the child returns an OK exit code, read the set of slave client
@@ -1331,9 +1522,9 @@ void backgroundSaveDoneHandlerSocket(int exitcode, int bysignal) {
 
     listRewind(server.slaves,&li);
     while((ln = listNext(&li))) {
-        redisClient *slave = ln->value;
+        client *slave = ln->value;
 
-        if (slave->replstate == REDIS_REPL_WAIT_BGSAVE_END) {
+        if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_END) {
             uint64_t j;
             int errorcode = 0;
 
@@ -1347,14 +1538,14 @@ void backgroundSaveDoneHandlerSocket(int exitcode, int bysignal) {
                 }
             }
             if (j == ok_slaves[0] || errorcode != 0) {
-                redisLog(REDIS_WARNING,
+                serverLog(LL_WARNING,
                 "Closing slave %s: child->slave RDB transfer failed: %s",
                     replicationGetSlaveName(slave),
                     (errorcode == 0) ? "RDB transfer child aborted"
                                      : strerror(errorcode));
                 freeClient(slave);
             } else {
-                redisLog(REDIS_WARNING,
+                serverLog(LL_WARNING,
                 "Slave %s correctly received the streamed RDB file.",
                     replicationGetSlaveName(slave));
                 /* Restore the socket as non-blocking. */
@@ -1365,26 +1556,26 @@ void backgroundSaveDoneHandlerSocket(int exitcode, int bysignal) {
     }
     zfree(ok_slaves);
 
-    updateSlavesWaitingBgsave((!bysignal && exitcode == 0) ? REDIS_OK : REDIS_ERR, REDIS_RDB_CHILD_TYPE_SOCKET);
+    updateSlavesWaitingBgsave((!bysignal && exitcode == 0) ? C_OK : C_ERR, RDB_CHILD_TYPE_SOCKET);
 }
 
 /* When a background RDB saving/transfer terminates, call the right handler. */
 void backgroundSaveDoneHandler(int exitcode, int bysignal) {
     switch(server.rdb_child_type) {
-    case REDIS_RDB_CHILD_TYPE_DISK:
+    case RDB_CHILD_TYPE_DISK:
         backgroundSaveDoneHandlerDisk(exitcode,bysignal);
         break;
-    case REDIS_RDB_CHILD_TYPE_SOCKET:
+    case RDB_CHILD_TYPE_SOCKET:
         backgroundSaveDoneHandlerSocket(exitcode,bysignal);
         break;
     default:
-        redisPanic("Unknown RDB child type.");
+        serverPanic("Unknown RDB child type.");
         break;
     }
 }
 
 /* Spawn an RDB child that writes the RDB to the sockets of the slaves
- * that are currently in REDIS_REPL_WAIT_BGSAVE_START state. */
+ * that are currently in SLAVE_STATE_WAIT_BGSAVE_START state. */
 int rdbSaveToSlavesSockets(void) {
     int *fds;
     uint64_t *clientids;
@@ -1395,12 +1586,12 @@ int rdbSaveToSlavesSockets(void) {
     long long start;
     int pipefds[2];
 
-    if (server.rdb_child_pid != -1) return REDIS_ERR;
+    if (server.aof_child_pid != -1 || server.rdb_child_pid != -1) return C_ERR;
 
     /* Before to fork, create a pipe that will be used in order to
      * send back to the parent the IDs of the slaves that successfully
      * received all the writes. */
-    if (pipe(pipefds) == -1) return REDIS_ERR;
+    if (pipe(pipefds) == -1) return C_ERR;
     server.rdb_pipe_read_result_from_child = pipefds[0];
     server.rdb_pipe_write_result_to_parent = pipefds[1];
 
@@ -1415,13 +1606,13 @@ int rdbSaveToSlavesSockets(void) {
 
     listRewind(server.slaves,&li);
     while((ln = listNext(&li))) {
-        redisClient *slave = ln->value;
+        client *slave = ln->value;
 
-        if (slave->replstate == REDIS_REPL_WAIT_BGSAVE_START) {
+        if (slave->replstate == SLAVE_STATE_WAIT_BGSAVE_START) {
             clientids[numfds] = slave->id;
             fds[numfds++] = slave->fd;
             replicationSetupSlaveForFullResync(slave,getPsyncInitialOffset());
-            /* Put the socket in non-blocking mode to simplify RDB transfer.
+            /* Put the socket in blocking mode to simplify RDB transfer.
              * We'll restore it when the children returns (since duped socket
              * will share the O_NONBLOCK attribute with the parent). */
             anetBlock(NULL,slave->fd);
@@ -1443,14 +1634,14 @@ int rdbSaveToSlavesSockets(void) {
         redisSetProcTitle("redis-rdb-to-slaves");
 
         retval = rdbSaveRioWithEOFMark(&slave_sockets,NULL);
-        if (retval == REDIS_OK && rioFlush(&slave_sockets) == 0)
-            retval = REDIS_ERR;
+        if (retval == C_OK && rioFlush(&slave_sockets) == 0)
+            retval = C_ERR;
 
-        if (retval == REDIS_OK) {
+        if (retval == C_OK) {
             size_t private_dirty = zmalloc_get_private_dirty();
 
             if (private_dirty) {
-                redisLog(REDIS_NOTICE,
+                serverLog(LL_NOTICE,
                     "RDB: %zu MB of memory used by copy-on-write",
                     private_dirty/(1024*1024));
             }
@@ -1490,19 +1681,20 @@ int rdbSaveToSlavesSockets(void) {
                 write(server.rdb_pipe_write_result_to_parent,msg,msglen)
                 != msglen)
             {
-                retval = REDIS_ERR;
+                retval = C_ERR;
             }
             zfree(msg);
         }
         zfree(clientids);
-        exitFromChild((retval == REDIS_OK) ? 0 : 1);
+        rioFreeFdset(&slave_sockets);
+        exitFromChild((retval == C_OK) ? 0 : 1);
     } else {
         /* Parent */
         server.stat_fork_time = ustime()-start;
         server.stat_fork_rate = (double) zmalloc_used_memory() * 1000000 / server.stat_fork_time / (1024*1024*1024); /* GB per second. */
         latencyAddSampleIfNeeded("fork",server.stat_fork_time/1000);
         if (childpid == -1) {
-            redisLog(REDIS_WARNING,"Can't save in background: fork: %s",
+            serverLog(LL_WARNING,"Can't save in background: fork: %s",
                 strerror(errno));
 
             /* Undo the state change. The caller will perform cleanup on
@@ -1510,12 +1702,12 @@ int rdbSaveToSlavesSockets(void) {
              * replicationSetupSlaveForFullResync() turned it into BGSAVE_END */
             listRewind(server.slaves,&li);
             while((ln = listNext(&li))) {
-                redisClient *slave = ln->value;
+                client *slave = ln->value;
                 int j;
 
                 for (j = 0; j < numfds; j++) {
                     if (slave->id == clientids[j]) {
-                        slave->replstate = REDIS_REPL_WAIT_BGSAVE_START;
+                        slave->replstate = SLAVE_STATE_WAIT_BGSAVE_START;
                         break;
                     }
                 }
@@ -1523,38 +1715,60 @@ int rdbSaveToSlavesSockets(void) {
             close(pipefds[0]);
             close(pipefds[1]);
         } else {
-            redisLog(REDIS_NOTICE,"Background RDB transfer started by pid %d",
+            serverLog(LL_NOTICE,"Background RDB transfer started by pid %d",
                 childpid);
             server.rdb_save_time_start = time(NULL);
             server.rdb_child_pid = childpid;
-            server.rdb_child_type = REDIS_RDB_CHILD_TYPE_SOCKET;
+            server.rdb_child_type = RDB_CHILD_TYPE_SOCKET;
             updateDictResizePolicy();
         }
         zfree(clientids);
         zfree(fds);
-        return (childpid == -1) ? REDIS_ERR : REDIS_OK;
+        return (childpid == -1) ? C_ERR : C_OK;
     }
-    return REDIS_OK; /* Unreached. */
+    return C_OK; /* Unreached. */
 }
 
-void saveCommand(redisClient *c) {
+void saveCommand(client *c) {
     if (server.rdb_child_pid != -1) {
         addReplyError(c,"Background save already in progress");
         return;
     }
-    if (rdbSave(server.rdb_filename) == REDIS_OK) {
+    if (rdbSave(server.rdb_filename) == C_OK) {
         addReply(c,shared.ok);
     } else {
         addReply(c,shared.err);
     }
 }
 
-void bgsaveCommand(redisClient *c) {
+/* BGSAVE [SCHEDULE] */
+void bgsaveCommand(client *c) {
+    int schedule = 0;
+
+    /* The SCHEDULE option changes the behavior of BGSAVE when an AOF rewrite
+     * is in progress. Instead of returning an error a BGSAVE gets scheduled. */
+    if (c->argc > 1) {
+        if (c->argc == 2 && !strcasecmp(c->argv[1]->ptr,"schedule")) {
+            schedule = 1;
+        } else {
+            addReply(c,shared.syntaxerr);
+            return;
+        }
+    }
+
     if (server.rdb_child_pid != -1) {
         addReplyError(c,"Background save already in progress");
     } else if (server.aof_child_pid != -1) {
-        addReplyError(c,"Can't BGSAVE while AOF log rewriting is in progress");
-    } else if (rdbSaveBackground(server.rdb_filename) == REDIS_OK) {
+        if (schedule) {
+            server.rdb_bgsave_scheduled = 1;
+            addReplyStatus(c,"Background saving scheduled");
+        } else {
+            addReplyError(c,
+                "An AOF log rewriting in progress: can't BGSAVE right now. "
+                "Use BGSAVE SCHEDULE in order to schedule a BGSAVE whenver "
+                "possible.");
+        }
+    } else if (rdbSaveBackground(server.rdb_filename) == C_OK) {
         addReplyStatus(c,"Background saving started");
     } else {
         addReply(c,shared.err);

@@ -16,8 +16,10 @@ set ::all_tests {
     unit/dump
     unit/auth
     unit/protocol
-    unit/basic
+    unit/keyspace
     unit/scan
+    unit/type/string
+    unit/type/incr
     unit/type/list
     unit/type/list-2
     unit/type/list-3
@@ -44,9 +46,12 @@ set ::all_tests {
     unit/scripting
     unit/maxmemory
     unit/introspection
+    unit/introspection-2
     unit/limits
     unit/obuf-limits
     unit/bitops
+    unit/bitfield
+    unit/geo
     unit/memefficiency
     unit/hyperloglog
 }
@@ -462,8 +467,11 @@ proc attach_to_replication_stream {} {
     flush $s
 
     # Get the count
-    set count [gets $s]
-    set prefix [string range $count 0 0]
+    while 1 {
+        set count [gets $s]
+        set prefix [string range $count 0 0]
+        if {$prefix ne {}} break; # Newlines are allowed as PINGs.
+    }
     if {$prefix ne {$}} {
         error "attach_to_replication_stream error. Received '$count' as count."
     }
