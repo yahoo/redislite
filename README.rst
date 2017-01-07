@@ -1,4 +1,4 @@
-redislite
+Redislite
 *********
 
 .. image:: https://img.shields.io/travis/yahoo/redislite.svg
@@ -37,7 +37,7 @@ Redislite is a self contained Python interface to the Redis key-value store.
 
 It provides enhanced versions of the Redis-Py Python bindings for Redis.  That provide the following added functionality:
 
-* **Easy to use** - It provides a built in Redis server that is autommatically installed, configured and managed when the Redis bindings are used.
+* **Easy to use** - It provides a built in Redis server that is automatically installed, configured and managed when the Redis bindings are used.
 * **Flexible** - Create a single server shared by multiple programs or multiple independent servers.  All the servers provided by Redislite support all Redis functionality including advanced features such as replication and clustering.
 * **Compatible** - It provides enhanced versions of the Redis-Py python Redis bindings as well as functions to patch them to allow most existing code that uses them to run with little or no modifications.
 * **Secure** - It uses a secure default Redis configuraton that is only accessible by the creating user on the computer system it is run on.
@@ -109,32 +109,26 @@ or from source:
 Getting Started
 ===============
 
-.. code-block:: python
-
-    >>> import redislite
-    >>> r = redislite.StrictRedis()
-    >>> r.set('foo', 'bar')
-    True
-    >>> r.get('foo')
-    'bar'
-
-Usage
-=====
-
-redislite provides enhanced versions of the redis.Redis() and 
-redis.StrictRedis() classes that  take the same arguments as the corresponding
+redislite provides enhanced versions of the redis-py redis.Redis() and 
+redis.StrictRedis() classes that take the same arguments as the corresponding
 redis classes and take one additional optional argument.  Which is the
 name of the Redis rdb file to use.  If the argument is not provided it will
-create a new one.
+create set up a new redis server.
 
 redislite also provides functions to MonkeyPatch the redis.Redis and 
 redis.StrictRedis classes to use redislite, so existing python code that uses
 Redis can use the redislite version.
     
-Example
-=======
+Examples
+========
 
-Here we open a Python shell and set a key in our embedded Redis db
+Here are some examples of using the redislite module.
+
+Setting a value
+---------------
+
+Here we open a Python shell and set a key in our embedded Redis db.  Redislite will automatically start the Redis server when
+the Redis() object is created and shut it down cleanly when the Python interpreter exits.
 
 .. code-block:: python
 
@@ -148,8 +142,10 @@ Here we open a Python shell and set a key in our embedded Redis db
     'value'
     >>> quit()
 
-Here we open the same Redis db and access the key we created during the last
-run
+Persistence
+-----------
+No we open the same Redis db and access the key we created during the last run.  Redislite will automatically start the
+Redis server using the same configuration as lat time, so the value that was set in the previous example is still available.
 
 .. code-block:: python
 
@@ -161,7 +157,10 @@ run
     'value'
     >>> quit()
 
-It's also possible to MonkeyPatch the normal Redis classes to allow modules 
+Compatibility
+-------------
+
+It's possible to MonkeyPatch the normal Redis classes to allow modules 
 that use Redis to use the redislite classes.  Here we patch Redis and use the 
 redis_collections module.
 
@@ -175,7 +174,48 @@ redis_collections module.
     >>> td.keys()
     ['foo']
 
-Finally it's possible ot spin up multiple instances with different
+
+Running and using Multiple servers
+----------------------------------
+
+Redislite will start a new server if the redis rdb fileame isn't specified or is new.  In this example we start 10 seperate redis servers and set the value of the key 'servernumber' to a different value in each server.  
+
+Then we access the value of 'servernumber' and print it.
+
+    >>> import redislite
+    >>> servers = {}
+    >>> for redis_server_number in range(10):
+    ...     servers[redis_server_number] = redislite.Redis()
+    ...     servers[redis_server_number].set('servernumber', redis_server_number)
+    ...
+    True
+    True
+    True
+    True
+    True
+    True
+    True
+    True
+    True
+    True
+    >>> for redis_server in servers.values():
+    ...     redis_server.get('servernumber')
+    ...
+    b'0'
+    b'1'
+    b'2'
+    b'3'
+    b'4'
+    b'5'
+    b'6'
+    b'7'
+    b'8'
+    b'9'
+
+Multiple Servers with different configurations in the same script
+-----------------------------------------------------------------
+
+It's possible to spin up multiple instances with different
 configuration settings for the Redis server.  Here is an example that sets up 2
 redis server instances.  One instance is configured to listen on port 8002, the
 second instance is a read-only slave of the first instance.
