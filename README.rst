@@ -16,8 +16,6 @@ redislite
 .. image:: https://img.shields.io/pypi/l/redislite.svg
     :target: https://pypi.python.org/pypi/redislite/
 
----------------------------------------------------------------------
-
 .. image:: https://readthedocs.org/projects/redislite/badge/?version=latest
     :target: http://redislite.readthedocs.org/en/latest/
     :alt: Documentation Status
@@ -34,11 +32,14 @@ redislite
 
 Description
 ===========
-Self contained Python interface to the Redis key-value store.
 
-It makes it possible to use Redis securely without the need to install and
-configure a redis server.
+Redislite is a self contained Python interface to the Redis key-value store.
 
+It provides enhanced versions of the Redis-Py Python bindings for Redis.  That provide the following added functionality:
+
+* **Easy to use** - It provides a built in Redis server that is autommatically installed, configured and managed when the Redis bindings are used.
+* **Compatible** - It provides enhanced versions of the Redis-Py python Redis bindings as well as functions to patch them to allow most existing code that uses them to run with little or no modifications.
+* **Secure** - It uses a secure default Redis configuraton that is only accessible by the creating user on the computer system it is run on.
 
 Requirements
 ------------
@@ -144,6 +145,7 @@ Here we open a Python shell and set a key in our embedded Redis db
     True
     >>> redis_connection.get('key')
     'value'
+    >>> quit()
 
 Here we open the same Redis db and access the key we created during the last
 run
@@ -156,6 +158,7 @@ run
     ['key']
     >>> redis_connection.get('key')
     'value'
+    >>> quit()
 
 It's also possible to MonkeyPatch the normal Redis classes to allow modules 
 that use Redis to use the redislite classes.  Here we patch Redis and use the 
@@ -172,16 +175,13 @@ redis_collections module.
     ['foo']
 
 Finally it's possible ot spin up multiple instances with different
-configuration values for the Redis server.  Here is an example that sets up 2
-redis instances.  One instance is configured to listen on port 8002, the
+configuration settings for the Redis server.  Here is an example that sets up 2
+redis server instances.  One instance is configured to listen on port 8002, the
 second instance is a read-only slave of the first instance.
 
 
 .. code-block:: python
 
-    Python 2.7.6 (default, Mar 22 2014, 22:59:56)
-    [GCC 4.8.2] on linux2
-    Type "help", "copyright", "credits" or "license" for more information.
     >>> import redislite
     >>> master=redislite.Redis(serverconfig={'port': '8002'})
     >>> slave=redislite.Redis(serverconfig={'slaveof': "127.0.0.1 8002"})
