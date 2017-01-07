@@ -7,9 +7,6 @@ redislite
 .. image:: https://img.shields.io/coveralls/yahoo/redislite.svg
   :target: https://coveralls.io/r/yahoo/redislite
 
-.. image:: https://img.shields.io/pypi/dm/redislite.svg
-    :target: https://pypi.python.org/pypi/redislite/
-
 .. image:: https://img.shields.io/pypi/v/redislite.svg
     :target: https://pypi.python.org/pypi/redislite/
 
@@ -45,7 +42,9 @@ configure a redis server.
 
 Requirements
 ------------
+
 The redislite module requires Python 2.7 or higher.
+
 
 Installing on Linux
 ~~~~~~~~~~~~~~~~~~~
@@ -77,7 +76,18 @@ running::
 
     xcode-select --install
 
+Installing on Microsoft Windows
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Redislite can be installed on newer releases of Windows 10 under the Bash on Ubuntu shell.
+
+Install it using the instructions at https://msdn.microsoft.com/commandline/wsl/install_guide 
+
+Then start the bash shell and install the python-dev package as follows::
+
+    apt-get install python-dev
+    
+    
 Installation
 ============
 
