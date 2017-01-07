@@ -38,6 +38,7 @@ Redislite is a self contained Python interface to the Redis key-value store.
 It provides enhanced versions of the Redis-Py Python bindings for Redis.  That provide the following added functionality:
 
 * **Easy to use** - It provides a built in Redis server that is autommatically installed, configured and managed when the Redis bindings are used.
+* **Flexible** - Create a single server shared by multiple programs or multiple independent servers.  All the servers provided by Redislite support all Redis functionality including advanced features such as replication and clustering.
 * **Compatible** - It provides enhanced versions of the Redis-Py python Redis bindings as well as functions to patch them to allow most existing code that uses them to run with little or no modifications.
 * **Secure** - It uses a secure default Redis configuraton that is only accessible by the creating user on the computer system it is run on.
 
