@@ -144,8 +144,8 @@ the Redis() object is created and shut it down cleanly when the Python interpret
 
 Persistence
 -----------
-No we open the same Redis db and access the key we created during the last run.  Redislite will automatically start the
-Redis server using the same configuration as lat time, so the value that was set in the previous example is still available.
+Now we open the same Redis db and access the key we created during the last run.  Redislite will automatically start the
+Redis server using the same configuration as last time, so the value that was set in the previous example is still available.
 
 .. code-block:: python
 
