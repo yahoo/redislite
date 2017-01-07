@@ -89,8 +89,8 @@ close $fd
 start_server_and_kill_it [list "dir" $server_path] {
     test {Server should not start if RDB is corrupted} {
         wait_for_condition 50 100 {
-            [string match {*RDB checksum*} \
-                [exec tail -n1 < [dict get $srv stdout]]]
+            [string match {*CRC error*} \
+                [exec tail -n10 < [dict get $srv stdout]]]
         } else {
             fail "Server started even if RDB was corrupted!"
         }
