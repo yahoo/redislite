@@ -92,3 +92,4 @@ test_unit_redis.db
 redis.submodule/**/*.o
 redis.submodule/**/.make-*
 redis.submodule/bin/
+/test_redislite_patch_redis_with_dbfile_in_cwd.db
