@@ -40,13 +40,13 @@
 #include <signal.h>
 #include <assert.h>
 
+#include <sds.h> /* Use hiredis sds. */
 #include "ae.h"
 #include "hiredis.h"
-#include "sds.h"
 #include "adlist.h"
 #include "zmalloc.h"
 
-#define REDIS_NOTUSED(V) ((void) V)
+#define UNUSED(V) ((void) V)
 #define RANDPTR_INITIAL_SIZE 8
 
 static struct config {
@@ -65,6 +65,7 @@ static struct config {
     int randomkeys_keyspacelen;
     int keepalive;
     int pipeline;
+    int showerrors;
     long long start;
     long long totlatency;
     long long *latency;
@@ -86,7 +87,7 @@ typedef struct _client {
     char **randptr;         /* Pointers to :rand: strings inside the command buf */
     size_t randlen;         /* Number of pointers in client->randptr */
     size_t randfree;        /* Number of unused pointers in client->randptr */
-    unsigned int written;   /* Bytes of 'obuf' already written */
+    size_t written;         /* Bytes of 'obuf' already written */
     long long start;        /* Start time of a request */
     long long latency;      /* Request latency */
     int pending;            /* Number of pending requests (replies to consume) */
@@ -188,9 +189,9 @@ static void clientDone(client c) {
 static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     client c = privdata;
     void *reply = NULL;
-    REDIS_NOTUSED(el);
-    REDIS_NOTUSED(fd);
-    REDIS_NOTUSED(mask);
+    UNUSED(el);
+    UNUSED(fd);
+    UNUSED(mask);
 
     /* Calculate latency only for the first read event. This means that the
      * server already sent the reply and we need to parse it. Parsing overhead
@@ -212,6 +213,16 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
                     exit(1);
                 }
 
+                if (config.showerrors) {
+                    static time_t lasterr_time = 0;
+                    time_t now = time(NULL);
+                    redisReply *r = reply;
+                    if (r->type == REDIS_REPLY_ERROR && lasterr_time != now) {
+                        lasterr_time = now;
+                        printf("Error from server: %s\n", r->str);
+                    }
+                }
+
                 freeReplyObject(reply);
                 /* This is an OK for prefix commands such as auth and select.*/
                 if (c->prefix_pending > 0) {
@@ -227,7 +238,7 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
                             c->randptr[j] -= c->prefixlen;
                         c->prefixlen = 0;
                     }
-                    continue;                
+                    continue;
                 }
 
                 if (config.requests_finished < config.requests)
@@ -246,9 +257,9 @@ static void readHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
 
 static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     client c = privdata;
-    REDIS_NOTUSED(el);
-    REDIS_NOTUSED(fd);
-    REDIS_NOTUSED(mask);
+    UNUSED(el);
+    UNUSED(fd);
+    UNUSED(mask);
 
     /* Initialize request when nothing was written. */
     if (c->written == 0) {
@@ -266,7 +277,7 @@ static void writeHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
 
     if (sdslen(c->obuf) > c->written) {
         void *ptr = c->obuf+c->written;
-        int nwritten = write(c->context->fd,ptr,sdslen(c->obuf)-c->written);
+        ssize_t nwritten = write(c->context->fd,ptr,sdslen(c->obuf)-c->written);
         if (nwritten == -1) {
             if (errno != EPIPE)
                 fprintf(stderr, "Writing to socket: %s\n", strerror(errno));
@@ -518,6 +529,8 @@ int parseOptions(int argc, const char **argv) {
             config.loop = 1;
         } else if (!strcmp(argv[i],"-I")) {
             config.idlemode = 1;
+        } else if (!strcmp(argv[i],"-e")) {
+            config.showerrors = 1;
         } else if (!strcmp(argv[i],"-t")) {
             if (lastarg) goto invalid;
             /* We get the list of tests to run as a string in the form
@@ -569,6 +582,8 @@ usage:
 "  is executed. Default tests use this to hit random keys in the\n"
 "  specified range.\n"
 " -P <numreq>        Pipeline <numreq> requests. Default 1 (no pipeline).\n"
+" -e                 If server replies with errors, show them on stdout.\n"
+"                    (no more than 1 error per second is displayed)\n"
 " -q                 Quiet. Just show query/sec values\n"
 " --csv              Output in CSV format\n"
 " -l                 Loop. Run the tests forever\n"
@@ -595,14 +610,14 @@ usage:
 }
 
 int showThroughput(struct aeEventLoop *eventLoop, long long id, void *clientData) {
-    REDIS_NOTUSED(eventLoop);
-    REDIS_NOTUSED(id);
-    REDIS_NOTUSED(clientData);
+    UNUSED(eventLoop);
+    UNUSED(id);
+    UNUSED(clientData);
 
     if (config.liveclients == 0) {
         fprintf(stderr,"All clients disconnected... aborting.\n");
         exit(1);
-    } 
+    }
     if (config.csv) return 250;
     if (config.idlemode == 1) {
         printf("clients: %d\r", config.liveclients);
@@ -649,6 +664,7 @@ int main(int argc, const char **argv) {
     config.keepalive = 1;
     config.datasize = 3;
     config.pipeline = 1;
+    config.showerrors = 0;
     config.randomkeys = 0;
     config.randomkeys_keyspacelen = 0;
     config.quiet = 0;
@@ -738,9 +754,21 @@ int main(int argc, const char **argv) {
             free(cmd);
         }
 
+        if (test_is_selected("rpush")) {
+            len = redisFormatCommand(&cmd,"RPUSH mylist %s",data);
+            benchmark("RPUSH",cmd,len);
+            free(cmd);
+        }
+
         if (test_is_selected("lpop")) {
             len = redisFormatCommand(&cmd,"LPOP mylist");
             benchmark("LPOP",cmd,len);
+            free(cmd);
+        }
+
+        if (test_is_selected("rpop")) {
+            len = redisFormatCommand(&cmd,"RPOP mylist");
+            benchmark("RPOP",cmd,len);
             free(cmd);
         }
 

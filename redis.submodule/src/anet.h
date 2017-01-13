@@ -31,6 +31,8 @@
 #ifndef ANET_H
 #define ANET_H
 
+#include <sys/types.h>
+
 #define ANET_OK 0
 #define ANET_ERR -1
 #define ANET_ERR_LEN 256
@@ -71,5 +73,8 @@ int anetSendTimeout(char *err, int fd, long long ms);
 int anetPeerToString(int fd, char *ip, size_t ip_len, int *port);
 int anetKeepAlive(char *err, int fd, int interval);
 int anetSockName(int fd, char *ip, size_t ip_len, int *port);
+int anetFormatAddr(char *fmt, size_t fmt_len, char *ip, int port);
+int anetFormatPeer(int fd, char *fmt, size_t fmt_len);
+int anetFormatSock(int fd, char *fmt, size_t fmt_len);
 
 #endif
