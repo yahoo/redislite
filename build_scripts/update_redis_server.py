@@ -20,4 +20,4 @@ if __name__ == "__main__":
         tf.extractall(tempdir)
         shutil.move(os.path.join(tempdir, directory), 'redis.submodule')
         os.system('(cd redis.submodule;./deps/update-jemalloc.sh 4.0.4)')
-	os.system('git add redis.submodule')
+        os.system('git add redis.submodule')
