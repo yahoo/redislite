@@ -275,6 +275,10 @@ static void cliIntegrateHelp(void) {
      * don't already match what we have. */
     for (size_t j = 0; j < reply->elements; j++) {
         redisReply *entry = reply->element[j];
+        if (entry->type != REDIS_REPLY_ARRAY || entry->elements < 4 ||
+            entry->element[0]->type != REDIS_REPLY_STRING ||
+            entry->element[1]->type != REDIS_REPLY_INTEGER ||
+            entry->element[3]->type != REDIS_REPLY_INTEGER) return;
         char *cmdname = entry->element[0]->str;
         int i;
 
@@ -1267,6 +1271,11 @@ static void repl(void) {
     int argc;
     sds *argv;
 
+    /* Initialize the help and, if possible, use the COMMAND command in order
+     * to retrieve missing entries. */
+    cliInitHelp();
+    cliIntegrateHelp();
+
     config.interactive = 1;
     linenoiseSetMultiLine(1);
     linenoiseSetCompletionCallback(completionCallback);
@@ -2013,8 +2022,13 @@ static void getKeyTypes(redisReply *keys, int *types) {
                 keys->element[i]->str, context->err, context->errstr);
             exit(1);
         } else if(reply->type != REDIS_REPLY_STATUS) {
-            fprintf(stderr, "Invalid reply type (%d) for TYPE on key '%s'!\n",
-                reply->type, keys->element[i]->str);
+            if(reply->type == REDIS_REPLY_ERROR) {
+                fprintf(stderr, "TYPE returned an error: %s\n", reply->str);
+            } else {
+                fprintf(stderr,
+                    "Invalid reply type (%d) for TYPE on key '%s'!\n",
+                    reply->type, keys->element[i]->str);
+            }
             exit(1);
         }
 
@@ -2596,11 +2610,6 @@ int main(int argc, char **argv) {
     firstarg = parseOptions(argc,argv);
     argc -= firstarg;
     argv += firstarg;
-
-    /* Initialize the help and, if possible, use the COMMAND command in order
-     * to retrieve missing entries. */
-    cliInitHelp();
-    cliIntegrateHelp();
 
     /* Latency mode */
     if (config.latency_mode) {
