@@ -25,6 +25,26 @@ REDIS_SERVER_METADATA = {}
 install_scripts = ''
 
 
+def update_redis_server_metadata(md_file, redis_server):
+    if os.path.exists(md_file):
+        with open(md_file) as fh:
+            md = json.load(fh)
+            md['redis_bin'] = redis_server
+
+        # Store the redis-server --version output for later
+        for line in os.popen('%s --version' % md['redis_bin']).readlines():
+            line = line.strip()
+            for item in line.split():
+                if '=' in item:
+                    key, value = item.split('=')
+                    REDIS_SERVER_METADATA[key] = value
+
+        md['redis_server'] = REDIS_SERVER_METADATA
+        print('new metadata: %s' % md)
+        with open(md_file, 'w') as fh:
+            json.dump(md, fh, indent=4)
+
+
 def readme():
     with open('README.rst') as f:
         return f.read()
@@ -196,6 +216,8 @@ if os.path.isdir('scripts'):
         os.path.join('scripts', f) for f in os.listdir('scripts')
     ]
 
+# If we are using an existing redis server, don't build the server
+
 
 class Git(object):
     version_list = ['0', '7', '0']
@@ -280,7 +302,18 @@ if __name__ == '__main__':
         )
         sys.exit(1)
 
-    os.environ['CC'] = 'gcc'
+    if os.environ.get('REDISLITE_SERVER_BIN', None):
+        if not os.path.exists(os.environ['REDISLITE_SERVER_BIN']):
+            print('Unable to find redis server %r', os.environ['REDISLITE_SERVER_BIN'])
+            sys.exit(1)
+
+        # Don't build and package the redis server
+        del setup_arguments['cmdclass']
+        del setup_arguments['ext_modules']
+        setup_arguments['package_data'] = {'redislite': ['package_metadata.json']}
+        update_redis_server_metadata('redislite/package_metadata.json', os.environ['REDISLITE_SERVER_BIN'])
+    else:
+        os.environ['CC'] = 'gcc'
 
     logging.basicConfig(level=logging.INFO)
 
