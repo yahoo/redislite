@@ -277,6 +277,13 @@ def get_and_update_metadata():
     if not os.path.exists('.git') and os.path.exists(METADATA_FILENAME):
         with open(METADATA_FILENAME) as fh:
             metadata = json.load(fh)
+    elif os.path.exists(METADATA_FILENAME) and os.environ.get('REDISLITE_SERVER_BIN', None):
+        with open(METADATA_FILENAME) as fh:
+            metadata = json.load(fh)
+        metadata['redis_server'] = REDIS_SERVER_METADATA
+        metadata['redis_bin'] = os.environ['REDISLITE_SERVER_BIN']
+        with open(METADATA_FILENAME, 'w') as fh:
+            json.dump(metadata, fh, indent=4)
     else:
         git = Git(version=setup_arguments['version'])
         metadata = {
