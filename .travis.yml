@@ -11,6 +11,8 @@ matrix:
   fast_finish: true
   allow_failures:
     - env:
+      - TOX_ENV=py35
+      - TOX_ENV=py36
       - TOX_ENV=pypy
       - TOX_ENV=build_docs
 install:
