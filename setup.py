@@ -11,8 +11,9 @@ from setuptools.command.install import install
 from distutils.command.build import build
 from distutils.core import Extension
 import distutils.util
+import os
 import sys
-from subprocess import call
+from subprocess import call, check_output, CalledProcessError
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,10 @@ BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
 REDIS_SERVER_METADATA = {}
 install_scripts = ''
+try:
+    VERSION = check_output(['meta', 'get', 'package.version']).decode(errors='ignore')
+except:
+    VERSION = '5.0.5'
 
 
 class BuildRedis(build):
@@ -214,7 +219,7 @@ def get_and_update_metadata():
         with open(METADATA_FILENAME) as fh:
             metadata = json.load(fh)
     else:
-        git = Git(version=setup_arguments['version'])
+        git = Git(version=VERSION)
         metadata = {
             'git_version': git.version,
             'git_origin': git.origin,
