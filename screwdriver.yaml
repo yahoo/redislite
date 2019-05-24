@@ -37,4 +37,4 @@ jobs:
     template: python/package_python
     environment:
       PUBLISH: True
-    requires: [package_rpm, verify_test_package]
+    requires: [verify_test_package]
