@@ -6,8 +6,8 @@ shared:
 jobs:
   validate_test:
     template: python/validate_unittest
-    steps:
-      - preend: coveralls
+    environment:
+      COVERALLS: True
     requires: [~commit, ~pr]
 
   validate_lint:
