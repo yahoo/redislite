@@ -11,8 +11,9 @@ from setuptools.command.install import install
 from distutils.command.build import build
 from distutils.core import Extension
 import distutils.util
+import os
 import sys
-from subprocess import call
+from subprocess import call, check_output, CalledProcessError
 
 
 logger = logging.getLogger(__name__)
@@ -23,11 +24,10 @@ BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
 REDIS_SERVER_METADATA = {}
 install_scripts = ''
-
-
-def readme():
-    with open('README.rst') as f:
-        return f.read()
+try:
+    VERSION = check_output(['meta', 'get', 'package.version']).decode(errors='ignore')
+except:
+    VERSION = '5.0.5'
 
 
 class BuildRedis(build):
@@ -132,43 +132,6 @@ class InstallRedis(install):
 # Create a dictionary of our arguments, this way this script can be imported
 #  without running setup() to allow external scripts to see the setup settings.
 args = {
-    'name': 'redislite',
-    'version': '3.2.0',
-    'author': 'Dwight Hubbard',
-    'author_email': 'dhubbard@yahoo-inc.com',
-    'url': 'https://github.com/yahoo/redislite',
-    'license': 'BSD',
-    'keywords': 'Redis sqlite',
-    'packages': ['redislite'],
-    'description': 'Redis built into a python package',
-    'install_requires': ['redis', 'psutil'],
-    'requires': ['redis', 'psutil'],
-    'long_description': readme(),
-    'classifiers': [
-            'Development Status :: 4 - Beta',
-            'Environment :: Console',
-            'Intended Audience :: Developers',
-            'License :: OSI Approved :: BSD License',
-            'Operating System :: MacOS :: MacOS X',
-            'Operating System :: POSIX :: BSD :: FreeBSD',
-            'Operating System :: POSIX :: Linux',
-            'Operating System :: POSIX :: SunOS/Solaris',
-            'Operating System :: POSIX',
-            'Programming Language :: C',
-            'Programming Language :: Python :: 2',
-            'Programming Language :: Python :: 2.7',
-            'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.4',
-            'Programming Language :: Python :: 3.5',
-            'Programming Language :: Python :: 3.6',
-            'Programming Language :: Python :: Implementation :: CPython',
-            'Programming Language :: Python :: Implementation :: PyPy',
-            'Programming Language :: Python',
-            'Topic :: Software Development :: Libraries :: Python Modules',
-            'Topic :: Software Development :: Libraries',
-            'Topic :: System :: Systems Administration',
-            'Topic :: Utilities',
-    ],
     'package_data': {
         'redislite': ['package_metadata.json', 'bin/redis-server'],
     },
@@ -256,7 +219,7 @@ def get_and_update_metadata():
         with open(METADATA_FILENAME) as fh:
             metadata = json.load(fh)
     else:
-        git = Git(version=setup_arguments['version'])
+        git = Git(version=VERSION)
         metadata = {
             'git_version': git.version,
             'git_origin': git.origin,
