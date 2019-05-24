@@ -33,7 +33,7 @@ DEFAULT_REDIS_SETTINGS = {
     'list-max-ziplist-entries': '512',
     'list-max-ziplist-value': '64',
     'loglevel': 'notice',
-    'logfile' : 'redis.log',
+    'logfile': 'redis.log',
     'lua-time-limit': '5000',
     'pidfile': '/var/run/redislite/redis.pid',
     'port': '0',
