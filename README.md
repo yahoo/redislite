@@ -1,9 +1,9 @@
 # Redislite
 
 [![Build Status](https://cd.screwdriver.cd/pipelines/2880/badge)](https://cd.screwdriver.cd/pipelines/2880)
-[![Coverage](https://img.shields.io/coveralls/yahoo/redislite.svg)](https://coveralls.io/r/yahoo/redislite)
+[![Coverage](https://codecov.io/gh/yahoo/redislite/branch/master/graph/badge.svg)](https://codecov.io/gh/yahoo/redislite)
 [![Current Version](https://img.shields.io/pypi/v/redislite.svg)](https://pypi.python.org/pypi/redislite/)
-[![Supported Python Versions](https://img.shields.io/badge/python-2.7,3.5,3.6,3.7,3.8,pypy-blue.svg)](https://pypi.python.org/pypi/redislite/)
+[![Supported Python](https://img.shields.io/badge/python-2.7,3.5,3.6,3.7,3.8,pypy-blue.svg)](https://pypi.python.org/pypi/redislite/)
 [![License](https://img.shields.io/pypi/l/redislite.svg)](https://pypi.python.org/pypi/redislite/)
 [![Documentation](https://readthedocs.org/projects/redislite/badge/?version=latest)](http://redislite.readthedocs.org/en/latest/)
 
