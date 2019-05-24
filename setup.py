@@ -250,6 +250,6 @@ if __name__ == '__main__':
     logger.debug('Building for platform: %s', distutils.util.get_platform())
 
     metadata = get_and_update_metadata()
-    setup_arguments['version'] = metadata['version']
+    # setup_arguments['version'] = metadata['version']
 
     setup(**setup_arguments)
