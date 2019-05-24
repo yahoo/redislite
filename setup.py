@@ -25,11 +25,6 @@ REDIS_SERVER_METADATA = {}
 install_scripts = ''
 
 
-def readme():
-    with open('README.rst') as f:
-        return f.read()
-
-
 class BuildRedis(build):
     global REDIS_SERVER_METADATA
 
@@ -132,43 +127,6 @@ class InstallRedis(install):
 # Create a dictionary of our arguments, this way this script can be imported
 #  without running setup() to allow external scripts to see the setup settings.
 args = {
-    'name': 'redislite',
-    'version': '3.2.0',
-    'author': 'Dwight Hubbard',
-    'author_email': 'dhubbard@yahoo-inc.com',
-    'url': 'https://github.com/yahoo/redislite',
-    'license': 'BSD',
-    'keywords': 'Redis sqlite',
-    'packages': ['redislite'],
-    'description': 'Redis built into a python package',
-    'install_requires': ['redis', 'psutil'],
-    'requires': ['redis', 'psutil'],
-    'long_description': readme(),
-    'classifiers': [
-            'Development Status :: 4 - Beta',
-            'Environment :: Console',
-            'Intended Audience :: Developers',
-            'License :: OSI Approved :: BSD License',
-            'Operating System :: MacOS :: MacOS X',
-            'Operating System :: POSIX :: BSD :: FreeBSD',
-            'Operating System :: POSIX :: Linux',
-            'Operating System :: POSIX :: SunOS/Solaris',
-            'Operating System :: POSIX',
-            'Programming Language :: C',
-            'Programming Language :: Python :: 2',
-            'Programming Language :: Python :: 2.7',
-            'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.4',
-            'Programming Language :: Python :: 3.5',
-            'Programming Language :: Python :: 3.6',
-            'Programming Language :: Python :: Implementation :: CPython',
-            'Programming Language :: Python :: Implementation :: PyPy',
-            'Programming Language :: Python',
-            'Topic :: Software Development :: Libraries :: Python Modules',
-            'Topic :: Software Development :: Libraries',
-            'Topic :: System :: Systems Administration',
-            'Topic :: Utilities',
-    ],
     'package_data': {
         'redislite': ['package_metadata.json', 'bin/redis-server'],
     },
