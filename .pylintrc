@@ -89,27 +89,9 @@ confidence=HIGH, INFERENCE, INFERENCE_FAILURE
 # W0611 - Unused import
 # W1401 - Anomaous backslash in string
 
-# Disabled due to false positives when used with django
-# E0633 X
-# E1101 X
-# E1136 X
 
-# I0011
 
-# Disabled to make lint pass, need to be enabled and fixed over time
-# W
-# C
-# R0201
-# R0204
-# R0801
-# R0901
-# R0902
-# R0903
-# R0904
-# R0912 X
-# R0914 X
-# R0915 X
-disable=W,C,R,I,E0633,E1101,E1136,W0621,C0103
+disable=W,C,R,I,E0633,E1101,W0621,C0103
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
