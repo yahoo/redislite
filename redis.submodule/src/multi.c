@@ -35,6 +35,7 @@
 void initClientMultiState(client *c) {
     c->mstate.commands = NULL;
     c->mstate.count = 0;
+    c->mstate.cmd_flags = 0;
 }
 
 /* Release all the resources associated with MULTI/EXEC state */
@@ -67,6 +68,7 @@ void queueMultiCommand(client *c) {
     for (j = 0; j < c->argc; j++)
         incrRefCount(mc->argv[j]);
     c->mstate.count++;
+    c->mstate.cmd_flags |= c->cmd->flags;
 }
 
 void discardTransaction(client *c) {
@@ -117,6 +119,7 @@ void execCommand(client *c) {
     int orig_argc;
     struct redisCommand *orig_cmd;
     int must_propagate = 0; /* Need to propagate MULTI/EXEC to AOF / slaves? */
+    int was_master = server.masterhost == NULL;
 
     if (!(c->flags & CLIENT_MULTI)) {
         addReplyError(c,"EXEC without MULTI");
@@ -136,6 +139,21 @@ void execCommand(client *c) {
         goto handle_monitor;
     }
 
+    /* If there are write commands inside the transaction, and this is a read
+     * only slave, we want to send an error. This happens when the transaction
+     * was initiated when the instance was a master or a writable replica and
+     * then the configuration changed (for example instance was turned into
+     * a replica). */
+    if (!server.loading && server.masterhost && server.repl_slave_ro &&
+        !(c->flags & CLIENT_MASTER) && c->mstate.cmd_flags & CMD_WRITE)
+    {
+        addReplyError(c,
+            "Transaction contains write commands but instance "
+            "is now a read-only slave. EXEC aborted.");
+        discardTransaction(c);
+        goto handle_monitor;
+    }
+
     /* Exec all the queued commands */
     unwatchAllKeys(c); /* Unwatch ASAP otherwise we'll waste CPU cycles */
     orig_argv = c->argv;
@@ -147,16 +165,17 @@ void execCommand(client *c) {
         c->argv = c->mstate.commands[j].argv;
         c->cmd = c->mstate.commands[j].cmd;
 
-        /* Propagate a MULTI request once we encounter the first write op.
+        /* Propagate a MULTI request once we encounter the first command which
+         * is not readonly nor an administrative one.
          * This way we'll deliver the MULTI/..../EXEC block as a whole and
          * both the AOF and the replication link will have the same consistency
          * and atomicity guarantees. */
-        if (!must_propagate && !(c->cmd->flags & CMD_READONLY)) {
+        if (!must_propagate && !(c->cmd->flags & (CMD_READONLY|CMD_ADMIN))) {
             execCommandPropagateMulti(c);
             must_propagate = 1;
         }
 
-        call(c,CMD_CALL_FULL);
+        call(c,server.loading ? CMD_CALL_NONE : CMD_CALL_FULL);
 
         /* Commands may alter argc/argv, restore mstate. */
         c->mstate.commands[j].argc = c->argc;
@@ -167,9 +186,22 @@ void execCommand(client *c) {
     c->argc = orig_argc;
     c->cmd = orig_cmd;
     discardTransaction(c);
+
     /* Make sure the EXEC command will be propagated as well if MULTI
      * was already propagated. */
-    if (must_propagate) server.dirty++;
+    if (must_propagate) {
+        int is_master = server.masterhost == NULL;
+        server.dirty++;
+        /* If inside the MULTI/EXEC block this instance was suddenly
+         * switched from master to slave (using the SLAVEOF command), the
+         * initial MULTI was propagated into the replication backlog, but the
+         * rest was not. We need to make sure to at least terminate the
+         * backlog with the final EXEC. */
+        if (server.repl_backlog && was_master && !is_master) {
+            char *execcmd = "*1\r\n$4\r\nEXEC\r\n";
+            feedReplicationBacklog(execcmd,strlen(execcmd));
+        }
+    }
 
 handle_monitor:
     /* Send EXEC to clients waiting data from MONITOR. We do it here

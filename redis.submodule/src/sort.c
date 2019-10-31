@@ -112,9 +112,9 @@ robj *lookupKeyByPattern(redisDb *db, robj *pattern, robj *subst) {
     if (fieldobj) {
         if (o->type != OBJ_HASH) goto noobj;
 
-        /* Retrieve value from hash by the field name. This operation
-         * already increases the refcount of the returned object. */
-        o = hashTypeGetObject(o, fieldobj);
+        /* Retrieve value from hash by the field name. The returend object
+         * is a new object with refcount already incremented. */
+        o = hashTypeGetValueObject(o, fieldobj->ptr);
     } else {
         if (o->type != OBJ_STRING) goto noobj;
 
@@ -193,7 +193,7 @@ void sortCommand(client *c) {
     long limit_start = 0, limit_count = -1, start, end;
     int j, dontsort = 0, vectorlen;
     int getop = 0; /* GET operation counter */
-    int int_convertion_error = 0;
+    int int_conversion_error = 0;
     int syntax_error = 0;
     robj *sortval, *sortby = NULL, *storekey = NULL;
     redisSortObject *vector; /* Resulting vector to sort */
@@ -380,9 +380,9 @@ void sortCommand(client *c) {
         listTypeReleaseIterator(li);
     } else if (sortval->type == OBJ_SET) {
         setTypeIterator *si = setTypeInitIterator(sortval);
-        robj *ele;
-        while((ele = setTypeNextObject(si)) != NULL) {
-            vector[j].obj = ele;
+        sds sdsele;
+        while((sdsele = setTypeNextObject(si)) != NULL) {
+            vector[j].obj = createObject(OBJ_STRING,sdsele);
             vector[j].u.score = 0;
             vector[j].u.cmpobj = NULL;
             j++;
@@ -399,7 +399,7 @@ void sortCommand(client *c) {
         zset *zs = sortval->ptr;
         zskiplist *zsl = zs->zsl;
         zskiplistNode *ln;
-        robj *ele;
+        sds sdsele;
         int rangelen = vectorlen;
 
         /* Check if starting point is trivial, before doing log(N) lookup. */
@@ -417,8 +417,8 @@ void sortCommand(client *c) {
 
         while(rangelen--) {
             serverAssertWithInfo(c,sortval,ln != NULL);
-            ele = ln->obj;
-            vector[j].obj = ele;
+            sdsele = ln->ele;
+            vector[j].obj = createStringObject(sdsele,sdslen(sdsele));
             vector[j].u.score = 0;
             vector[j].u.cmpobj = NULL;
             j++;
@@ -431,9 +431,11 @@ void sortCommand(client *c) {
         dict *set = ((zset*)sortval->ptr)->dict;
         dictIterator *di;
         dictEntry *setele;
+        sds sdsele;
         di = dictGetIterator(set);
         while((setele = dictNext(di)) != NULL) {
-            vector[j].obj = dictGetKey(setele);
+            sdsele =  dictGetKey(setele);
+            vector[j].obj = createStringObject(sdsele,sdslen(sdsele));
             vector[j].u.score = 0;
             vector[j].u.cmpobj = NULL;
             j++;
@@ -445,7 +447,7 @@ void sortCommand(client *c) {
     serverAssertWithInfo(c,sortval,j == vectorlen);
 
     /* Now it's time to load the right scores in the sorting vector */
-    if (dontsort == 0) {
+    if (!dontsort) {
         for (j = 0; j < vectorlen; j++) {
             robj *byval;
             if (sortby) {
@@ -467,7 +469,7 @@ void sortCommand(client *c) {
                     if (eptr[0] != '\0' || errno == ERANGE ||
                         isnan(vector[j].u.score))
                     {
-                        int_convertion_error = 1;
+                        int_conversion_error = 1;
                     }
                 } else if (byval->encoding == OBJ_ENCODING_INT) {
                     /* Don't need to decode the object if it's
@@ -485,9 +487,7 @@ void sortCommand(client *c) {
                 decrRefCount(byval);
             }
         }
-    }
 
-    if (dontsort == 0) {
         server.sort_desc = desc;
         server.sort_alpha = alpha;
         server.sort_bypattern = sortby ? 1 : 0;
@@ -501,7 +501,7 @@ void sortCommand(client *c) {
     /* Send command output to the output buffer, performing the specified
      * GET/DEL/INCR/DECR operations if any. */
     outputlen = getop ? getop*(end-start+1) : end-start+1;
-    if (int_convertion_error) {
+    if (int_conversion_error) {
         addReplyError(c,"One or more scores can't be converted into double");
     } else if (storekey == NULL) {
         /* STORE option not specified, sent the sorting result to client */
@@ -577,9 +577,9 @@ void sortCommand(client *c) {
     }
 
     /* Cleanup */
-    if (sortval->type == OBJ_LIST || sortval->type == OBJ_SET)
-        for (j = 0; j < vectorlen; j++)
-            decrRefCount(vector[j].obj);
+    for (j = 0; j < vectorlen; j++)
+        decrRefCount(vector[j].obj);
+
     decrRefCount(sortval);
     listRelease(operations);
     for (j = 0; j < vectorlen; j++) {
