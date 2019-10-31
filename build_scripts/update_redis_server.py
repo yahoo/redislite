@@ -18,7 +18,7 @@ if __name__ == "__main__":
         tf = tarfile.open(fileobj=ftpstream, mode="r|gz")
         directory = tf.next().name
         
-        print('Extracting archive {directory}')
+        print(f'Extracting archive {directory}')
         tf.extractall(tempdir)
         
         print(f'Moving {os.path.join(tempdir, directory)} -> redis.submodule')
