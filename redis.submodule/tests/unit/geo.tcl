@@ -49,6 +49,9 @@ proc compare_lists {List1 List2} {
 #
 # The format is: seed km lon lat
 set regression_vectors {
+    {1482225976969 7083 81.634948934258375 30.561509253718668}
+    {1482340074151 5416 -70.863281847379767 -46.347003465679947}
+    {1499014685896 6064 -89.818768962202014 -40.463868561416803}
     {1412 156 149.29737817929004 15.95807862745508}
     {441574 143 59.235461856813856 66.269555127373678}
     {160645 187 -101.88575239939883 49.061997951502917}
@@ -254,10 +257,11 @@ start_server {tags {"geo"}} {
             for {set j 0} {$j < 20000} {incr j} {
                 geo_random_point lon lat
                 lappend argv $lon $lat "place:$j"
-                if {[geo_distance $lon $lat $search_lon $search_lat] < $radius_m} {
+                set distance [geo_distance $lon $lat $search_lon $search_lat]
+                if {$distance < $radius_m} {
                     lappend tcl_result "place:$j"
-                    lappend debuginfo "place:$j $lon $lat [expr {[geo_distance $lon $lat $search_lon $search_lat]/1000}] km"
                 }
+                lappend debuginfo "place:$j $lon $lat [expr {$distance/1000}] km"
             }
             r geoadd mypoints {*}$argv
             set res [lsort [r georadius mypoints $search_lon $search_lat $radius_km km]]
