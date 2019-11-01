@@ -66,6 +66,8 @@ try:
     import pkg_resources
     __git_version__ = pkg_resources.get_distribution("redislite").version
     __version__ = __git_version__
+except ImportError:
+    pass
     
 
 _metadata_file = os.path.join(
