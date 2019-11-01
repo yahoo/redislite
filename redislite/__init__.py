@@ -62,6 +62,11 @@ __redis_server_info__ = {}
 __redis_executable__ = str('')
 __redis_server_version__ = str('')
 
+try:
+    import pkg_resources
+    __git_version__ = pkg_resources.get_distribution("redislite").version
+    __version__ = __git_version__
+    
 
 _metadata_file = os.path.join(
     os.path.dirname(__file__),
@@ -72,8 +77,6 @@ _metadata_file = os.path.join(
 if os.path.exists(_metadata_file):  # pragma: no cover
     with open(_metadata_file) as fh:
         _package_metadata = json.load(fh)
-        __version__ = str(_package_metadata['version'])
-        __git_version__ = str(_package_metadata['git_version'])
         __git_origin__ = str(_package_metadata['git_origin'])
         __git_branch__ = str(_package_metadata['git_branch'])
         __git_hash__ = str(_package_metadata['git_hash'])
