@@ -221,11 +221,9 @@ def get_and_update_metadata():
     else:
         git = Git(version=VERSION)
         metadata = {
-            'git_version': git.version,
             'git_origin': git.origin,
             'git_branch': git.branch,
             'git_hash': git.hash,
-            'version': git.version,
             'redis_server': REDIS_SERVER_METADATA,
             'redis_bin': install_scripts
         }
@@ -250,6 +248,5 @@ if __name__ == '__main__':
     logger.debug('Building for platform: %s', distutils.util.get_platform())
 
     metadata = get_and_update_metadata()
-    # setup_arguments['version'] = metadata['version']
 
     setup(**setup_arguments)
