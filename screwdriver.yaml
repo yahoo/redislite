@@ -55,7 +55,7 @@ jobs:
       PACKAGE_TAG: False
       PUBLISH: True
       TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-    requires: [validate_test, validate_lint, validate_codestyle, generate_version]
+    requires: [validate_test, validate_lint, validate_codestyle, package_sdist, package_manylinux2010, package_manylinux2014, generate_version]
 
   publish_test_pypi_manylinux2014:
     template: python/package_python
