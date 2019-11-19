@@ -21,7 +21,30 @@ jobs:
     environment:
       DOCUMENTATION_PUBLISH: False
     requires: [~pr]
-        
+  
+  package_sdist:
+    template: python/package_python
+    environment:
+      PACKAGE_TYPES: sdist
+      PUBLISH: False
+    requires: [~pr]
+
+  package_manylinux2010:
+    template: python/package_python
+    image: manylinux2010
+    environment:
+      PACKAGE_TYPES: wheel
+      PUBLISH: False
+    requires: [~pr]
+
+  package_manylinux2014:
+    template: python/package_python
+    image: manylinux2014
+    environment:
+      PACKAGE_TYPES: wheel
+      PUBLISH: False
+    requires: [~pr]
+    
   generate_version:
     template: python/generate_version
     requires: [~commit]
@@ -31,6 +54,16 @@ jobs:
     environment:
       PACKAGE_TAG: False
       PUBLISH: True
+      TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
+    requires: [validate_test, validate_lint, validate_codestyle, package_sdist, package_manylinux2010, package_manylinux2014, generate_version]
+
+  publish_test_pypi_manylinux2014:
+    template: python/package_python
+    image: manylinux2014
+    environment:
+      PACKAGE_TAG: False
+      PACKAGE_TYPES: wheel
+      PUBLISH: False
       TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
     requires: [validate_test, validate_lint, validate_codestyle, generate_version]
 
@@ -48,4 +81,13 @@ jobs:
     template: python/package_python
     environment:
       PUBLISH: True
+    requires: [verify_test_package]
+
+  publish_pypi_manylinux2014:
+    template: python/package_python
+    image: manylinux2014
+    environment:
+      PACKAGE_TAG: False
+      PACKAGE_TYPES: wheel
+      PUBLISH: False
     requires: [verify_test_package]
