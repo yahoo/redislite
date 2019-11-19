@@ -63,7 +63,6 @@ jobs:
     environment:
       PACKAGE_TAG: False
       PACKAGE_TYPES: wheel
-      PUBLISH: False
       TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
     requires: [validate_test, validate_lint, validate_codestyle, package_sdist, validate_documentation, package_manylinux2010, package_manylinux2014, generate_version]
 
@@ -89,5 +88,4 @@ jobs:
     environment:
       PACKAGE_TAG: False
       PACKAGE_TYPES: wheel
-      PUBLISH: False
     requires: [verify_test_package]
