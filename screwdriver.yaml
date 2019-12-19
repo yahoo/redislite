@@ -1,6 +1,7 @@
 version: 4
 shared:
   environment:
+    CHANGELOG_FILENAME: docs/source/topic/changelog.md
     PACKAGE_DIRECTORY: redislite
 
 jobs:
