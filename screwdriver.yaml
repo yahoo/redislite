@@ -120,7 +120,7 @@ jobs:
 
   publish_pypi_ml1_64:
     template: python/package_python
-    image: manylinux2014
+    image: manylinux1_64
     environment:
       PACKAGE_TAG: False
       PACKAGE_TYPES: wheel
