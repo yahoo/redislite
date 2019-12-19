@@ -111,7 +111,7 @@ jobs:
     requires: [verify_test_pkg, verify_test_pkg_ml1, verify_test_pkg_ml2014]
 
   publish_pypi:
-    # This template runs in an manylinux2010 container and
+    # This template runs in a manylinux2010 container and
     # publishes manylinux2010 wheels
     template: python/package_python
     environment:
