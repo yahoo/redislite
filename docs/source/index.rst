@@ -23,6 +23,7 @@ Table of Contents
    topic/command_line
 
    topic/contributing
+   topic/changelog
 
 
 Indices and tables
