@@ -1,0 +1,60 @@
+extra:
+    config_override: false
+    doc_owner: Verizon Python Language Platform Team
+    doc_owner_shortid: python
+
+extra_css: []
+
+markdown_extensions:
+    - admonition
+    - codehilite
+    - toc:
+        permalink: true
+        toc_depth: 4
+    - pymdownx.arithmatex
+    - pymdownx.betterem:
+        smart_enable: all
+    - pymdownx.caret
+    - pymdownx.critic
+    - pymdownx.details
+    - pymdownx.inlinehilite
+    - pymdownx.magiclink
+    - pymdownx.mark
+    - pymdownx.smartsymbols
+    - pymdownx.superfences
+    - pymdownx.tabbed
+    - pymdownx.tasklist:
+        custom_checkbox: true
+    - pymdownx.tilde
+
+nav:
+    - Overview: index.md
+    - What is redislite: topic/what_is_redislite.md
+    - Using with existing code: topic/using_with_existing_modules.md
+    - Redislite CLI: topic/command_line.md
+    - Contributing to Redislite:
+        - Overview: topic/contributing.md
+        - Design of redislite: topic/redislite_design.md
+    - Changelog: changelog.md
+
+plugins:
+    - search
+
+theme:
+    name: material
+    highlightjs: true
+    hljs_language:
+        - yaml
+        - toml
+        - python
+        - console
+        - bash
+
+remote_branch: gh-pages
+remote_name: origin
+repo_name: GitHub
+repo_url: https://github.com/yahoo/redislite
+site_description: Python module with redis integrated
+site_name: Python redislite
+strict: true
+use_directory_urls: true
