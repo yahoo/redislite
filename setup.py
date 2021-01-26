@@ -235,8 +235,7 @@ def get_and_update_metadata():
 if __name__ == '__main__':
     if sys.platform in UNSUPPORTED_PLATFORMS:
         print(
-            'The redislite module is not supported on the %r '
-            'platform' % sys.platform,
+            'The redislite module is not supported on the Microsoft windows %r platform' % sys.platform,
             file=sys.stderr
         )
         sys.exit(1)
