@@ -1,9 +1,11 @@
 # Redislite
 
+[![CI/CD](https://img.shields.io/badge/CI/CD-Screwdriver-blue.svg)](https://screwdriver.cd/)
 [![Build Status](https://cd.screwdriver.cd/pipelines/2880/badge)](https://cd.screwdriver.cd/pipelines/2880)
+[![Codestyle](https://img.shields.io/badge/code%20style-pep8-blue.svg)](https://www.python.org/dev/peps/pep-0008/)
 [![Coverage](https://codecov.io/gh/yahoo/redislite/branch/master/graph/badge.svg)](https://codecov.io/gh/yahoo/redislite)
 [![Current Version](https://img.shields.io/pypi/v/redislite.svg)](https://pypi.python.org/pypi/redislite/)
-[![Supported Python](https://img.shields.io/badge/python-2.7,3.5,3.6,3.7,3.8,pypy-blue.svg)](https://pypi.python.org/pypi/redislite/)
+[![Supported Python](https://img.shields.io/badge/python-3.6,3.7,3.8-blue.svg)](https://pypi.python.org/pypi/redislite/)
 [![License](https://img.shields.io/pypi/l/redislite.svg)](https://pypi.python.org/pypi/redislite/)
 [![Documentation](https://readthedocs.org/projects/redislite/badge/?version=latest)](http://redislite.readthedocs.org/en/latest/)
 
@@ -21,7 +23,7 @@ It provides enhanced versions of the Redis-Py Python bindings for Redis.  That p
 
 ## Requirements
 
-The redislite module requires Python 2.7 or higher.
+The redislite module requires Python 3.6 or higher.
 
 
 ### Installing requirements on Linux

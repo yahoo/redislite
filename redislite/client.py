@@ -424,7 +424,7 @@ class RedisMixin(object):
 
         with open(self.logfile) as log_handle:
             if lines == 0:
-                return [l.strip() for l in log_handle.readlines()]
+                return [_.strip() for _ in log_handle.readlines()]
             log_handle.seek(0, 2)
             log_size = log_handle.tell()
             if log_size == 0:
@@ -436,8 +436,8 @@ class RedisMixin(object):
                 log_handle.seek(seek_location, 0)
                 data = log_handle.readlines()
                 if len(data) >= lines:
-                    return [l.strip() for l in data[-lines:]]
-            return [l.strip() for l in data]
+                    return [_.strip() for _ in data[-lines:]]
+            return [_.strip() for _ in data]
 
     @property
     def redis_log(self):
