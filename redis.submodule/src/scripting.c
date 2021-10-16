@@ -31,6 +31,7 @@
 #include "sha1.h"
 #include "rand.h"
 #include "cluster.h"
+#include "monotonic.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -42,7 +43,10 @@ char *redisProtocolToLuaType_Int(lua_State *lua, char *reply);
 char *redisProtocolToLuaType_Bulk(lua_State *lua, char *reply);
 char *redisProtocolToLuaType_Status(lua_State *lua, char *reply);
 char *redisProtocolToLuaType_Error(lua_State *lua, char *reply);
-char *redisProtocolToLuaType_MultiBulk(lua_State *lua, char *reply);
+char *redisProtocolToLuaType_Aggregate(lua_State *lua, char *reply, int atype);
+char *redisProtocolToLuaType_Null(lua_State *lua, char *reply);
+char *redisProtocolToLuaType_Bool(lua_State *lua, char *reply, int tf);
+char *redisProtocolToLuaType_Double(lua_State *lua, char *reply);
 int redis_math_random (lua_State *L);
 int redis_math_randomseed (lua_State *L);
 void ldbInit(void);
@@ -58,7 +62,7 @@ sds ldbCatStackValue(sds s, lua_State *lua, int idx);
 #define LDB_BREAKPOINTS_MAX 64  /* Max number of breakpoints. */
 #define LDB_MAX_LEN_DEFAULT 256 /* Default len limit for replies / var dumps. */
 struct ldbState {
-    int fd;     /* Socket of the debugging client. */
+    connection *conn; /* Connection of the debugging client. */
     int active; /* Are we debugging EVAL right now? */
     int forked; /* Is this a fork()ed debugging session? */
     list *logs; /* List of messages to send to the client. */
@@ -66,7 +70,7 @@ struct ldbState {
     list *children; /* All forked debugging sessions pids. */
     int bp[LDB_BREAKPOINTS_MAX]; /* An array of breakpoints line numbers. */
     int bpcount; /* Number of valid entries inside bp. */
-    int step;   /* Stop at next line ragardless of breakpoints. */
+    int step;   /* Stop at next line regardless of breakpoints. */
     int luabp;  /* Stop at next line because redis.breakpoint() was called. */
     sds *src;   /* Lua script source code split by line. */
     int lines;  /* Number of lines in 'src'. */
@@ -125,6 +129,16 @@ void sha1hex(char *digest, char *script, size_t len) {
  */
 
 char *redisProtocolToLuaType(lua_State *lua, char* reply) {
+
+    if (!lua_checkstack(lua, 5)) {
+        /*
+         * Increase the Lua stack if needed, to make sure there is enough room
+         * to push 5 elements to the stack. On failure, exit with panic.
+         * Notice that we need, in the worst case, 5 elements because redisProtocolToLuaType_Aggregate
+         * might push 5 elements to the Lua stack.*/
+        serverPanic("lua stack limit reach when parsing redis.call reply");
+    }
+
     char *p = reply;
 
     switch(*p) {
@@ -132,7 +146,12 @@ char *redisProtocolToLuaType(lua_State *lua, char* reply) {
     case '$': p = redisProtocolToLuaType_Bulk(lua,reply); break;
     case '+': p = redisProtocolToLuaType_Status(lua,reply); break;
     case '-': p = redisProtocolToLuaType_Error(lua,reply); break;
-    case '*': p = redisProtocolToLuaType_MultiBulk(lua,reply); break;
+    case '*': p = redisProtocolToLuaType_Aggregate(lua,reply,*p); break;
+    case '%': p = redisProtocolToLuaType_Aggregate(lua,reply,*p); break;
+    case '~': p = redisProtocolToLuaType_Aggregate(lua,reply,*p); break;
+    case '_': p = redisProtocolToLuaType_Null(lua,reply); break;
+    case '#': p = redisProtocolToLuaType_Bool(lua,reply,p[1]); break;
+    case ',': p = redisProtocolToLuaType_Double(lua,reply); break;
     }
     return p;
 }
@@ -180,24 +199,83 @@ char *redisProtocolToLuaType_Error(lua_State *lua, char *reply) {
     return p+2;
 }
 
-char *redisProtocolToLuaType_MultiBulk(lua_State *lua, char *reply) {
+char *redisProtocolToLuaType_Aggregate(lua_State *lua, char *reply, int atype) {
     char *p = strchr(reply+1,'\r');
     long long mbulklen;
     int j = 0;
 
     string2ll(reply+1,p-reply-1,&mbulklen);
-    p += 2;
-    if (mbulklen == -1) {
-        lua_pushboolean(lua,0);
-        return p;
-    }
-    lua_newtable(lua);
-    for (j = 0; j < mbulklen; j++) {
-        lua_pushnumber(lua,j+1);
-        p = redisProtocolToLuaType(lua,p);
+    if (server.lua_client->resp == 2 || atype == '*') {
+        p += 2;
+        if (mbulklen == -1) {
+            lua_pushboolean(lua,0);
+            return p;
+        }
+        lua_newtable(lua);
+        for (j = 0; j < mbulklen; j++) {
+            lua_pushnumber(lua,j+1);
+            p = redisProtocolToLuaType(lua,p);
+            lua_settable(lua,-3);
+        }
+    } else if (server.lua_client->resp == 3) {
+        /* Here we handle only Set and Map replies in RESP3 mode, since arrays
+         * follow the above RESP2 code path. Note that those are represented
+         * as a table with the "map" or "set" field populated with the actual
+         * table representing the set or the map type. */
+        p += 2;
+        lua_newtable(lua);
+        lua_pushstring(lua,atype == '%' ? "map" : "set");
+        lua_newtable(lua);
+        for (j = 0; j < mbulklen; j++) {
+            p = redisProtocolToLuaType(lua,p);
+            if (atype == '%') {
+                p = redisProtocolToLuaType(lua,p);
+            } else {
+                if (!lua_checkstack(lua, 1)) {
+                    /* Notice that here we need to check the stack again because the recursive
+                     * call to redisProtocolToLuaType might have use the room allocated in the stack */
+                    serverPanic("lua stack limit reach when parsing redis.call reply");
+                }
+                lua_pushboolean(lua,1);
+            }
+            lua_settable(lua,-3);
+        }
         lua_settable(lua,-3);
     }
     return p;
+}
+
+char *redisProtocolToLuaType_Null(lua_State *lua, char *reply) {
+    char *p = strchr(reply+1,'\r');
+    lua_pushnil(lua);
+    return p+2;
+}
+
+char *redisProtocolToLuaType_Bool(lua_State *lua, char *reply, int tf) {
+    char *p = strchr(reply+1,'\r');
+    lua_pushboolean(lua,tf == 't');
+    return p+2;
+}
+
+char *redisProtocolToLuaType_Double(lua_State *lua, char *reply) {
+    char *p = strchr(reply+1,'\r');
+    char buf[MAX_LONG_DOUBLE_CHARS+1];
+    size_t len = p-reply-1;
+    double d;
+
+    if (len <= MAX_LONG_DOUBLE_CHARS) {
+        memcpy(buf,reply+1,len);
+        buf[len] = '\0';
+        d = strtod(buf,NULL); /* We expect a valid representation. */
+    } else {
+        d = 0;
+    }
+
+    lua_newtable(lua);
+    lua_pushstring(lua,"double");
+    lua_pushnumber(lua,d);
+    lua_settable(lua,-3);
+    return p+2;
 }
 
 /* This function is used in order to push an error on the Lua stack in the
@@ -274,7 +352,20 @@ void luaSortArray(lua_State *lua) {
  * Lua reply to Redis reply conversion functions.
  * ------------------------------------------------------------------------- */
 
+/* Reply to client 'c' converting the top element in the Lua stack to a
+ * Redis reply. As a side effect the element is consumed from the stack.  */
 void luaReplyToRedisReply(client *c, lua_State *lua) {
+
+    if (!lua_checkstack(lua, 4)) {
+        /* Increase the Lua stack if needed to make sure there is enough room
+         * to push 4 elements to the stack. On failure, return error.
+         * Notice that we need, in the worst case, 4 elements because returning a map might
+         * require push 4 elements to the Lua stack.*/
+        addReplyErrorFormat(c, "reached lua stack limit");
+        lua_pop(lua,1); /* pop the element from the stack */
+        return;
+    }
+
     int t = lua_type(lua,-1);
 
     switch(t) {
@@ -282,7 +373,11 @@ void luaReplyToRedisReply(client *c, lua_State *lua) {
         addReplyBulkCBuffer(c,(char*)lua_tostring(lua,-1),lua_strlen(lua,-1));
         break;
     case LUA_TBOOLEAN:
-        addReply(c,lua_toboolean(lua,-1) ? shared.cone : shared.nullbulk);
+        if (server.lua_client->resp == 2)
+            addReply(c,lua_toboolean(lua,-1) ? shared.cone :
+                                               shared.null[c->resp]);
+        else
+            addReplyBool(c,lua_toboolean(lua,-1));
         break;
     case LUA_TNUMBER:
         addReplyLongLong(c,(long long)lua_tonumber(lua,-1));
@@ -292,19 +387,20 @@ void luaReplyToRedisReply(client *c, lua_State *lua) {
          * Error are returned as a single element table with 'err' field.
          * Status replies are returned as single element table with 'ok'
          * field. */
+
+        /* Handle error reply. */
+        /* we took care of the stack size on function start */
         lua_pushstring(lua,"err");
         lua_gettable(lua,-2);
         t = lua_type(lua,-1);
         if (t == LUA_TSTRING) {
-            sds err = sdsnew(lua_tostring(lua,-1));
-            sdsmapchars(err,"\r\n","  ",2);
-            addReplySds(c,sdscatprintf(sdsempty(),"-%s\r\n",err));
-            sdsfree(err);
+            addReplyErrorFormat(c,"-%s",lua_tostring(lua,-1));
             lua_pop(lua,2);
             return;
         }
+        lua_pop(lua,1); /* Discard field name pushed before. */
 
-        lua_pop(lua,1);
+        /* Handle status reply. */
         lua_pushstring(lua,"ok");
         lua_gettable(lua,-2);
         t = lua_type(lua,-1);
@@ -313,28 +409,87 @@ void luaReplyToRedisReply(client *c, lua_State *lua) {
             sdsmapchars(ok,"\r\n","  ",2);
             addReplySds(c,sdscatprintf(sdsempty(),"+%s\r\n",ok));
             sdsfree(ok);
-            lua_pop(lua,1);
-        } else {
-            void *replylen = addDeferredMultiBulkLength(c);
-            int j = 1, mbulklen = 0;
-
-            lua_pop(lua,1); /* Discard the 'ok' field value we popped */
-            while(1) {
-                lua_pushnumber(lua,j++);
-                lua_gettable(lua,-2);
-                t = lua_type(lua,-1);
-                if (t == LUA_TNIL) {
-                    lua_pop(lua,1);
-                    break;
-                }
-                luaReplyToRedisReply(c, lua);
-                mbulklen++;
-            }
-            setDeferredMultiBulkLength(c,replylen,mbulklen);
+            lua_pop(lua,2);
+            return;
         }
+        lua_pop(lua,1); /* Discard field name pushed before. */
+
+        /* Handle double reply. */
+        lua_pushstring(lua,"double");
+        lua_gettable(lua,-2);
+        t = lua_type(lua,-1);
+        if (t == LUA_TNUMBER) {
+            addReplyDouble(c,lua_tonumber(lua,-1));
+            lua_pop(lua,2);
+            return;
+        }
+        lua_pop(lua,1); /* Discard field name pushed before. */
+
+        /* Handle map reply. */
+        lua_pushstring(lua,"map");
+        lua_gettable(lua,-2);
+        t = lua_type(lua,-1);
+        if (t == LUA_TTABLE) {
+            int maplen = 0;
+            void *replylen = addReplyDeferredLen(c);
+            /* we took care of the stack size on function start */
+            lua_pushnil(lua); /* Use nil to start iteration. */
+            while (lua_next(lua,-2)) {
+                /* Stack now: table, key, value */
+                lua_pushvalue(lua,-2);        /* Dup key before consuming. */
+                luaReplyToRedisReply(c, lua); /* Return key. */
+                luaReplyToRedisReply(c, lua); /* Return value. */
+                /* Stack now: table, key. */
+                maplen++;
+            }
+            setDeferredMapLen(c,replylen,maplen);
+            lua_pop(lua,2);
+            return;
+        }
+        lua_pop(lua,1); /* Discard field name pushed before. */
+
+        /* Handle set reply. */
+        lua_pushstring(lua,"set");
+        lua_gettable(lua,-2);
+        t = lua_type(lua,-1);
+        if (t == LUA_TTABLE) {
+            int setlen = 0;
+            void *replylen = addReplyDeferredLen(c);
+            /* we took care of the stack size on function start */
+            lua_pushnil(lua); /* Use nil to start iteration. */
+            while (lua_next(lua,-2)) {
+                /* Stack now: table, key, true */
+                lua_pop(lua,1);               /* Discard the boolean value. */
+                lua_pushvalue(lua,-1);        /* Dup key before consuming. */
+                luaReplyToRedisReply(c, lua); /* Return key. */
+                /* Stack now: table, key. */
+                setlen++;
+            }
+            setDeferredSetLen(c,replylen,setlen);
+            lua_pop(lua,2);
+            return;
+        }
+        lua_pop(lua,1); /* Discard field name pushed before. */
+
+        /* Handle the array reply. */
+        void *replylen = addReplyDeferredLen(c);
+        int j = 1, mbulklen = 0;
+        while(1) {
+            /* we took care of the stack size on function start */
+            lua_pushnumber(lua,j++);
+            lua_gettable(lua,-2);
+            t = lua_type(lua,-1);
+            if (t == LUA_TNIL) {
+                lua_pop(lua,1);
+                break;
+            }
+            luaReplyToRedisReply(c, lua);
+            mbulklen++;
+        }
+        setDeferredArrayLen(c,replylen,mbulklen);
         break;
     default:
-        addReply(c,shared.nullbulk);
+        addReplyNull(c);
     }
     lua_pop(lua,1);
 }
@@ -357,13 +512,6 @@ int luaRedisGenericCommand(lua_State *lua, int raise_error) {
     static robj *cached_objects[LUA_CMD_OBJCACHE_SIZE];
     static size_t cached_objects_len[LUA_CMD_OBJCACHE_SIZE];
     static int inuse = 0;   /* Recursive calls detection. */
-
-    /* Reflect MULTI state */
-    if (server.lua_multi_emitted || (server.lua_caller->flags & CLIENT_MULTI)) {
-        c->flags |= CLIENT_MULTI;
-    } else {
-        c->flags &= ~CLIENT_MULTI;
-    }
 
     /* By using Lua debug hooks it is possible to trigger a recursive call
      * to luaRedisGenericCommand(), which normally should never happen.
@@ -442,6 +590,7 @@ int luaRedisGenericCommand(lua_State *lua, int raise_error) {
     /* Setup our fake client for command execution */
     c->argv = argv;
     c->argc = argc;
+    c->user = server.lua_caller->user;
 
     /* Process module hooks */
     moduleCallCommandFilters(c);
@@ -484,6 +633,33 @@ int luaRedisGenericCommand(lua_State *lua, int raise_error) {
         goto cleanup;
     }
 
+    /* Check the ACLs. */
+    int acl_errpos;
+    int acl_retval = ACLCheckAllPerm(c,&acl_errpos);
+    if (acl_retval != ACL_OK) {
+        addACLLogEntry(c,acl_retval,acl_errpos,NULL);
+        switch (acl_retval) {
+        case ACL_DENIED_CMD:
+            luaPushError(lua, "The user executing the script can't run this "
+                              "command or subcommand");
+            break;
+        case ACL_DENIED_KEY:
+            luaPushError(lua, "The user executing the script can't access "
+                              "at least one of the keys mentioned in the "
+                              "command arguments");
+            break;
+        case ACL_DENIED_CHANNEL:
+            luaPushError(lua, "The user executing the script can't publish "
+                              "to the channel mentioned in the command");
+            break;
+        default:
+            luaPushError(lua, "The user executing the script is lacking the "
+                              "permissions for the command");
+            break;
+        }
+        goto cleanup;
+    }
+
     /* Write commands are forbidden against read-only slaves, or if a
      * command marked as non-deterministic was already called in the context
      * of this script. */
@@ -521,12 +697,11 @@ int luaRedisGenericCommand(lua_State *lua, int raise_error) {
         !server.loading &&              /* Don't care about mem if loading. */
         !server.masterhost &&           /* Slave must execute the script. */
         server.lua_write_dirty == 0 &&  /* Script had no side effects so far. */
+        server.lua_oom &&               /* Detected OOM when script start. */
         (cmd->flags & CMD_DENYOOM))
     {
-        if (getMaxmemoryState(NULL,NULL,NULL,NULL) != C_OK) {
-            luaPushError(lua, shared.oomerr->ptr);
-            goto cleanup;
-        }
+        luaPushError(lua, shared.oomerr->ptr);
+        goto cleanup;
     }
 
     if (cmd->flags & CMD_RANDOM) server.lua_random_dirty = 1;
@@ -538,15 +713,27 @@ int luaRedisGenericCommand(lua_State *lua, int raise_error) {
     if (server.cluster_enabled && !server.loading &&
         !(server.lua_caller->flags & CLIENT_MASTER))
     {
+        int error_code;
         /* Duplicate relevant flags in the lua client. */
         c->flags &= ~(CLIENT_READONLY|CLIENT_ASKING);
         c->flags |= server.lua_caller->flags & (CLIENT_READONLY|CLIENT_ASKING);
-        if (getNodeByQuery(c,c->cmd,c->argv,c->argc,NULL,NULL) !=
+        if (getNodeByQuery(c,c->cmd,c->argv,c->argc,NULL,&error_code) !=
                            server.cluster->myself)
         {
-            luaPushError(lua,
-                "Lua script attempted to access a non local key in a "
-                "cluster node");
+            if (error_code == CLUSTER_REDIR_DOWN_RO_STATE) {
+                luaPushError(lua,
+                    "Lua script attempted to execute a write command while the "
+                    "cluster is down and readonly");
+            } else if (error_code == CLUSTER_REDIR_DOWN_STATE) {
+                luaPushError(lua,
+                    "Lua script attempted to execute a command while the "
+                    "cluster is down");
+            } else {
+                luaPushError(lua,
+                    "Lua script attempted to access a non local key in a "
+                    "cluster node");
+            }
+
             goto cleanup;
         }
     }
@@ -560,8 +747,11 @@ int luaRedisGenericCommand(lua_State *lua, int raise_error) {
         server.lua_write_dirty &&
         server.lua_repl != PROPAGATE_NONE)
     {
-        execCommandPropagateMulti(server.lua_caller);
+        execCommandPropagateMulti(server.lua_caller->db->id);
         server.lua_multi_emitted = 1;
+        /* Now we are in the MULTI context, the lua_client should be
+         * flag as CLIENT_MULTI. */
+        c->flags |= CLIENT_MULTI;
     }
 
     /* Run the command */
@@ -574,6 +764,7 @@ int luaRedisGenericCommand(lua_State *lua, int raise_error) {
             call_flags |= CMD_CALL_PROPAGATE_REPL;
     }
     call(c,call_flags);
+    serverAssert((c->flags & CLIENT_BLOCKED) == 0);
 
     /* Convert the result of the Redis command into a suitable Lua type.
      * The first thing we need is to create a single string from the client
@@ -641,6 +832,8 @@ cleanup:
         argv = NULL;
         argv_size = 0;
     }
+
+    c->user = NULL;
 
     if (raise_error) {
         /* If we are here we should have an error in the stack, in the
@@ -734,7 +927,7 @@ int luaRedisReplicateCommandsCommand(lua_State *lua) {
 
 /* redis.breakpoint()
  *
- * Allows to stop execution during a debuggign session from within
+ * Allows to stop execution during a debugging session from within
  * the Lua code implementation, like if a breakpoint was set in the code
  * immediately after the function. */
 int luaRedisBreakpointCommand(lua_State *lua) {
@@ -807,6 +1000,7 @@ int luaLogCommand(lua_State *lua) {
         lua_pushstring(lua, "Invalid debug level.");
         return lua_error(lua);
     }
+    if (level < server.verbosity) return 0;
 
     /* Glue together all the arguments */
     log = sdsempty();
@@ -822,6 +1016,25 @@ int luaLogCommand(lua_State *lua) {
     }
     serverLogRaw(level,log);
     sdsfree(log);
+    return 0;
+}
+
+/* redis.setresp() */
+int luaSetResp(lua_State *lua) {
+    int argc = lua_gettop(lua);
+
+    if (argc != 1) {
+        lua_pushstring(lua, "redis.setresp() requires one argument.");
+        return lua_error(lua);
+    }
+
+    int resp = lua_tonumber(lua,-argc);
+    if (resp != 2 && resp != 3) {
+        lua_pushstring(lua, "RESP version must be 2 or 3.");
+        return lua_error(lua);
+    }
+
+    server.lua_client->resp = resp;
     return 0;
 }
 
@@ -921,6 +1134,7 @@ void scriptingInit(int setup) {
     if (setup) {
         server.lua_client = NULL;
         server.lua_caller = NULL;
+        server.lua_cur_script = NULL;
         server.lua_timedout = 0;
         ldbInit();
     }
@@ -950,6 +1164,11 @@ void scriptingInit(int setup) {
     /* redis.log and log levels. */
     lua_pushstring(lua,"log");
     lua_pushcfunction(lua,luaLogCommand);
+    lua_settable(lua,-3);
+
+    /* redis.setresp */
+    lua_pushstring(lua,"setresp");
+    lua_pushcfunction(lua,luaSetResp);
     lua_settable(lua,-3);
 
     lua_pushstring(lua,"LOG_DEBUG");
@@ -1075,8 +1294,11 @@ void scriptingInit(int setup) {
      * Note: there is no need to create it again when this function is called
      * by scriptingReset(). */
     if (server.lua_client == NULL) {
-        server.lua_client = createClient(-1);
+        server.lua_client = createClient(NULL);
         server.lua_client->flags |= CLIENT_LUA;
+
+        /* We do not want to allow blocking commands inside Lua */
+        server.lua_client->flags |= CLIENT_DENY_BLOCKING;
     }
 
     /* Lua beginners often don't use "local", this is likely to introduce
@@ -1089,14 +1311,17 @@ void scriptingInit(int setup) {
 
 /* Release resources related to Lua scripting.
  * This function is used in order to reset the scripting environment. */
-void scriptingRelease(void) {
-    dictRelease(server.lua_scripts);
+void scriptingRelease(int async) {
+    if (async)
+        freeLuaScriptsAsync(server.lua_scripts);
+    else
+        dictRelease(server.lua_scripts);
     server.lua_scripts_mem = 0;
     lua_close(server.lua);
 }
 
-void scriptingReset(void) {
-    scriptingRelease();
+void scriptingReset(int async) {
+    scriptingRelease(async);
     scriptingInit(0);
 }
 
@@ -1233,15 +1458,20 @@ sds luaCreateFunction(client *c, lua_State *lua, robj *body) {
 
 /* This is the Lua script "count" hook that we use to detect scripts timeout. */
 void luaMaskCountHook(lua_State *lua, lua_Debug *ar) {
-    long long elapsed = mstime() - server.lua_time_start;
+    long long elapsed = elapsedMs(server.lua_time_start);
     UNUSED(ar);
     UNUSED(lua);
 
     /* Set the timeout condition if not already set and the maximum
      * execution time was reached. */
     if (elapsed >= server.lua_time_limit && server.lua_timedout == 0) {
-        serverLog(LL_WARNING,"Lua slow script detected: still in execution after %lld milliseconds. You can try killing the script using the SCRIPT KILL command.",elapsed);
+        serverLog(LL_WARNING,
+            "Lua slow script detected: still in execution after %lld milliseconds. "
+            "You can try killing the script using the SCRIPT KILL command. "
+            "Script SHA1 is: %s",
+            elapsed, server.lua_cur_script);
         server.lua_timedout = 1;
+        blockingOperationStarts();
         /* Once the script timeouts we reenter the event loop to permit others
          * to call SCRIPT KILL or SHUTDOWN NOSAVE if needed. For this reason
          * we need to mask the client executing the script from the event loop.
@@ -1252,9 +1482,33 @@ void luaMaskCountHook(lua_State *lua, lua_Debug *ar) {
     if (server.lua_timedout) processEventsWhileBlocked();
     if (server.lua_kill) {
         serverLog(LL_WARNING,"Lua script killed by user with SCRIPT KILL.");
+
+        /*
+         * Set the hook to invoke all the time so the user
+         * will not be able to catch the error with pcall and invoke
+         * pcall again which will prevent the script from ever been killed
+         */
+        lua_sethook(lua, luaMaskCountHook, LUA_MASKLINE, 0);
+
         lua_pushstring(lua,"Script killed by user with SCRIPT KILL...");
         lua_error(lua);
     }
+}
+
+void prepareLuaClient(void) {
+    /* Select the right DB in the context of the Lua client */
+    selectDb(server.lua_client,server.lua_caller->db->id);
+    server.lua_client->resp = 2; /* Default is RESP2, scripts can change it. */
+
+    /* If we are in MULTI context, flag Lua client as CLIENT_MULTI. */
+    if (server.lua_caller->flags & CLIENT_MULTI) {
+        server.lua_client->flags |= CLIENT_MULTI;
+    }
+}
+
+void resetLuaClient(void) {
+    /* After the script done, remove the MULTI state. */
+    server.lua_client->flags &= ~CLIENT_MULTI;
 }
 
 void evalGenericCommand(client *c, int evalsha) {
@@ -1301,7 +1555,7 @@ void evalGenericCommand(client *c, int evalsha) {
         /* Hash the code if this is an EVAL call */
         sha1hex(funcname+2,c->argv[1]->ptr,sdslen(c->argv[1]->ptr));
     } else {
-        /* We already have the SHA if it is a EVALSHA */
+        /* We already have the SHA if it is an EVALSHA */
         int j;
         char *sha = c->argv[1]->ptr;
 
@@ -1326,7 +1580,7 @@ void evalGenericCommand(client *c, int evalsha) {
          * return an error. */
         if (evalsha) {
             lua_pop(lua,1); /* remove the error handler from the stack. */
-            addReply(c, shared.noscripterr);
+            addReplyErrorObject(c, shared.noscripterr);
             return;
         }
         if (luaCreateFunction(c,lua,c->argv[1]) == NULL) {
@@ -1345,9 +1599,6 @@ void evalGenericCommand(client *c, int evalsha) {
     luaSetGlobalArray(lua,"KEYS",c->argv+3,numkeys);
     luaSetGlobalArray(lua,"ARGV",c->argv+3+numkeys,c->argc-3-numkeys);
 
-    /* Select the right DB in the context of the Lua client */
-    selectDb(server.lua_client,c->db->id);
-
     /* Set a hook in order to be able to stop the script execution if it
      * is running for too much time.
      * We set the hook only if the time limit is enabled as the hook will
@@ -1355,8 +1606,11 @@ void evalGenericCommand(client *c, int evalsha) {
      *
      * If we are debugging, we set instead a "line" hook so that the
      * debugger is call-back at every line executed by the script. */
+    server.in_eval = 1;
     server.lua_caller = c;
-    server.lua_time_start = mstime();
+    server.lua_cur_script = funcname + 2;
+    server.lua_time_start = getMonotonicUs();
+    server.lua_time_snapshot = mstime();
     server.lua_kill = 0;
     if (server.lua_time_limit > 0 && ldb.active == 0) {
         lua_sethook(lua,luaMaskCountHook,LUA_MASKCOUNT,100000);
@@ -1366,22 +1620,29 @@ void evalGenericCommand(client *c, int evalsha) {
         delhook = 1;
     }
 
+    prepareLuaClient();
+
     /* At this point whether this script was never seen before or if it was
      * already defined, we can call it. We have zero arguments and expect
      * a single return value. */
     err = lua_pcall(lua,0,1,-2);
 
+    resetLuaClient();
+
     /* Perform some cleanup that we need to do both on error and success. */
     if (delhook) lua_sethook(lua,NULL,0,0); /* Disable hook */
     if (server.lua_timedout) {
         server.lua_timedout = 0;
+        blockingOperationEnds();
         /* Restore the client that was protected when the script timeout
          * was detected. */
         unprotectClient(c);
         if (server.masterhost && server.master)
             queueClientForReprocessing(server.master);
     }
+    server.in_eval = 0;
     server.lua_caller = NULL;
+    server.lua_cur_script = NULL;
 
     /* Call the Lua garbage collector from time to time to avoid a
      * full cycle performed by Lua, which adds too latency.
@@ -1416,11 +1677,7 @@ void evalGenericCommand(client *c, int evalsha) {
     if (server.lua_replicate_commands) {
         preventCommandPropagation(c);
         if (server.lua_multi_emitted) {
-            robj *propargv[1];
-            propargv[0] = createStringObject("EXEC",4);
-            alsoPropagate(server.execCommand,c->db->id,propargv,1,
-                PROPAGATE_AOF|PROPAGATE_REPL);
-            decrRefCount(propargv[0]);
+            execCommandPropagateExec(c->db->id);
         }
     }
 
@@ -1431,7 +1688,7 @@ void evalGenericCommand(client *c, int evalsha) {
      * To do so we use a cache of SHA1s of scripts that we already propagated
      * as full EVAL, that's called the Replication Script Cache.
      *
-     * For repliation, everytime a new slave attaches to the master, we need to
+     * For replication, everytime a new slave attaches to the master, we need to
      * flush our cache of scripts that can be replicated as EVALSHA, while
      * for AOF we need to do so every time we rewrite the AOF file. */
     if (evalsha && !server.lua_replicate_commands) {
@@ -1450,12 +1707,11 @@ void evalGenericCommand(client *c, int evalsha) {
              * or just running a CPU costly read-only script on the slaves. */
             if (server.dirty == initial_server_dirty) {
                 rewriteClientCommandVector(c,3,
-                    resetRefCount(createStringObject("SCRIPT",6)),
-                    resetRefCount(createStringObject("LOAD",4)),
+                    shared.script,
+                    shared.load,
                     script);
             } else {
-                rewriteClientCommandArgument(c,0,
-                    resetRefCount(createStringObject("EVAL",4)));
+                rewriteClientCommandArgument(c,0,shared.eval);
                 rewriteClientCommandArgument(c,1,script);
             }
             forceCommandPropagation(c,PROPAGATE_REPL|PROPAGATE_AOF);
@@ -1464,6 +1720,9 @@ void evalGenericCommand(client *c, int evalsha) {
 }
 
 void evalCommand(client *c) {
+    /* Explicitly feed monitor here so that lua commands appear after their
+     * script command. */
+    replicationFeedMonitors(c,server.monitors,c->db->id,c->argv,c->argc);
     if (!(c->flags & CLIENT_LUA_DEBUG))
         evalGenericCommand(c,0);
     else
@@ -1471,12 +1730,15 @@ void evalCommand(client *c) {
 }
 
 void evalShaCommand(client *c) {
+    /* Explicitly feed monitor here so that lua commands appear after their
+     * script command. */
+    replicationFeedMonitors(c,server.monitors,c->db->id,c->argv,c->argc);
     if (sdslen(c->argv[1]->ptr) != 40) {
         /* We know that a match is not possible if the provided SHA is
          * not the right length. So we return an error ASAP, this way
          * evalGenericCommand() can be implemented without string length
          * sanity check */
-        addReply(c, shared.noscripterr);
+        addReplyErrorObject(c, shared.noscripterr);
         return;
     }
     if (!(c->flags & CLIENT_LUA_DEBUG))
@@ -1490,23 +1752,43 @@ void evalShaCommand(client *c) {
 void scriptCommand(client *c) {
     if (c->argc == 2 && !strcasecmp(c->argv[1]->ptr,"help")) {
         const char *help[] = {
-"DEBUG (yes|sync|no) -- Set the debug mode for subsequent scripts executed.",
-"EXISTS <sha1> [<sha1> ...] -- Return information about the existence of the scripts in the script cache.",
-"FLUSH -- Flush the Lua scripts cache. Very dangerous on replicas.",
-"KILL -- Kill the currently executing Lua script.",
-"LOAD <script> -- Load a script into the scripts cache, without executing it.",
+"DEBUG (YES|SYNC|NO)",
+"    Set the debug mode for subsequent scripts executed.",
+"EXISTS <sha1> [<sha1> ...]",
+"    Return information about the existence of the scripts in the script cache.",
+"FLUSH [ASYNC|SYNC]",
+"    Flush the Lua scripts cache. Very dangerous on replicas.",
+"    When called without the optional mode argument, the behavior is determined by the",
+"    lazyfree-lazy-user-flush configuration directive. Valid modes are:",
+"    * ASYNC: Asynchronously flush the scripts cache.",
+"    * SYNC: Synchronously flush the scripts cache.",
+"KILL",
+"    Kill the currently executing Lua script.",
+"LOAD <script>",
+"    Load a script into the scripts cache without executing it.",
 NULL
         };
         addReplyHelp(c, help);
-    } else if (c->argc == 2 && !strcasecmp(c->argv[1]->ptr,"flush")) {
-        scriptingReset();
+    } else if (c->argc >= 2 && !strcasecmp(c->argv[1]->ptr,"flush")) {
+        int async = 0;
+        if (c->argc == 3 && !strcasecmp(c->argv[2]->ptr,"sync")) {
+            async = 0;
+        } else if (c->argc == 3 && !strcasecmp(c->argv[2]->ptr,"async")) {
+            async = 1;
+        } else if (c->argc == 2) {
+            async = server.lazyfree_lazy_user_flush ? 1 : 0;
+        } else {
+            addReplyError(c,"SCRIPT FLUSH only support SYNC|ASYNC option");
+            return;
+        }
+        scriptingReset(async);
         addReply(c,shared.ok);
         replicationScriptCacheFlush();
         server.dirty++; /* Propagating this command is a good idea. */
     } else if (c->argc >= 2 && !strcasecmp(c->argv[1]->ptr,"exists")) {
         int j;
 
-        addReplyMultiBulkLen(c, c->argc-2);
+        addReplyArrayLen(c, c->argc-2);
         for (j = 2; j < c->argc; j++) {
             if (dictFind(server.lua_scripts,c->argv[j]->ptr))
                 addReply(c,shared.cone);
@@ -1520,11 +1802,11 @@ NULL
         forceCommandPropagation(c,PROPAGATE_REPL|PROPAGATE_AOF);
     } else if (c->argc == 2 && !strcasecmp(c->argv[1]->ptr,"kill")) {
         if (server.lua_caller == NULL) {
-            addReplySds(c,sdsnew("-NOTBUSY No scripts in execution right now.\r\n"));
+            addReplyError(c,"-NOTBUSY No scripts in execution right now.");
         } else if (server.lua_caller->flags & CLIENT_MASTER) {
-            addReplySds(c,sdsnew("-UNKILLABLE The busy script was sent by a master instance in the context of replication and cannot be killed.\r\n"));
+            addReplyError(c,"-UNKILLABLE The busy script was sent by a master instance in the context of replication and cannot be killed.");
         } else if (server.lua_write_dirty) {
-            addReplySds(c,sdsnew("-UNKILLABLE Sorry the script already executed write commands against the dataset. You can either wait the script termination or kill the server in a hard way using the SHUTDOWN NOSAVE command.\r\n"));
+            addReplyError(c,"-UNKILLABLE Sorry the script already executed write commands against the dataset. You can either wait the script termination or kill the server in a hard way using the SHUTDOWN NOSAVE command.");
         } else {
             server.lua_kill = 1;
             addReply(c,shared.ok);
@@ -1545,7 +1827,7 @@ NULL
             addReply(c,shared.ok);
             c->flags |= CLIENT_LUA_DEBUG_SYNC;
         } else {
-            addReplyError(c,"Use SCRIPT DEBUG yes/sync/no");
+            addReplyError(c,"Use SCRIPT DEBUG YES/SYNC/NO");
             return;
         }
     } else {
@@ -1559,7 +1841,7 @@ NULL
 
 /* Initialize Lua debugger data structures. */
 void ldbInit(void) {
-    ldb.fd = -1;
+    ldb.conn = NULL;
     ldb.active = 0;
     ldb.logs = listCreate();
     listSetFreeMethod(ldb.logs,(void (*)(void*))sdsfree);
@@ -1581,7 +1863,7 @@ void ldbFlushLog(list *log) {
 void ldbEnable(client *c) {
     c->flags |= CLIENT_LUA_DEBUG;
     ldbFlushLog(ldb.logs);
-    ldb.fd = c->fd;
+    ldb.conn = c->conn;
     ldb.step = 1;
     ldb.bpcount = 0;
     ldb.luabp = 0;
@@ -1604,7 +1886,7 @@ void ldbLog(sds entry) {
 }
 
 /* A version of ldbLog() which prevents producing logs greater than
- * ldb.maxlen. The first time the limit is reached an hint is generated
+ * ldb.maxlen. The first time the limit is reached a hint is generated
  * to inform the user that reply trimming can be disabled using the
  * debugger "maxlen" command. */
 void ldbLogWithMaxLen(sds entry) {
@@ -1636,7 +1918,7 @@ void ldbSendLogs(void) {
         proto = sdscatlen(proto,"\r\n",2);
         listDelNode(ldb.logs,ln);
     }
-    if (write(ldb.fd,proto,sdslen(proto)) == -1) {
+    if (connWrite(ldb.conn,proto,sdslen(proto)) == -1) {
         /* Avoid warning. We don't check the return value of write()
          * since the next read() will catch the I/O error and will
          * close the debugging session. */
@@ -1645,7 +1927,7 @@ void ldbSendLogs(void) {
 }
 
 /* Start a debugging session before calling EVAL implementation.
- * The techique we use is to capture the client socket file descriptor,
+ * The technique we use is to capture the client socket file descriptor,
  * in order to perform direct I/O with it from within Lua hooks. This
  * way we don't have to re-enter Redis in order to handle I/O.
  *
@@ -1659,7 +1941,7 @@ void ldbSendLogs(void) {
 int ldbStartSession(client *c) {
     ldb.forked = (c->flags & CLIENT_LUA_DEBUG_SYNC) == 0;
     if (ldb.forked) {
-        pid_t cp = fork();
+        pid_t cp = redisFork(CHILD_TYPE_LDB);
         if (cp == -1) {
             addReplyError(c,"Fork() failed: can't run EVAL in debugging mode.");
             return 0;
@@ -1676,7 +1958,6 @@ int ldbStartSession(client *c) {
              * socket to make sure if the parent crashes a reset is sent
              * to the clients. */
             serverLog(LL_WARNING,"Redis forked for debugging eval");
-            closeListeningSockets(0);
         } else {
             /* Parent */
             listAddNodeTail(ldb.children,(void*)(unsigned long)cp);
@@ -1689,8 +1970,8 @@ int ldbStartSession(client *c) {
     }
 
     /* Setup our debugging session. */
-    anetBlock(NULL,ldb.fd);
-    anetSendTimeout(NULL,ldb.fd,5000);
+    connBlock(ldb.conn);
+    connSendTimeout(ldb.conn,5000);
     ldb.active = 1;
 
     /* First argument of EVAL is the script itself. We split it into different
@@ -1717,7 +1998,7 @@ void ldbEndSession(client *c) {
 
     /* If it's a fork()ed session, we just exit. */
     if (ldb.forked) {
-        writeToClient(c->fd, c, 0);
+        writeToClient(c,0);
         serverLog(LL_WARNING,"Lua debugging session child exiting");
         exitFromChild(0);
     } else {
@@ -1726,10 +2007,10 @@ void ldbEndSession(client *c) {
     }
 
     /* Otherwise let's restore client's state. */
-    anetNonBlock(NULL,ldb.fd);
-    anetSendTimeout(NULL,ldb.fd,0);
+    connNonBlock(ldb.conn);
+    connSendTimeout(ldb.conn,0);
 
-    /* Close the client connectin after sending the final EVAL reply
+    /* Close the client connection after sending the final EVAL reply
      * in order to signal the end of the debugging session. */
     c->flags |= CLIENT_CLOSE_AFTER_REPLY;
 
@@ -1830,7 +2111,8 @@ int ldbDelBreakpoint(int line) {
 /* Expect a valid multi-bulk command in the debugging client query buffer.
  * On success the command is parsed and returned as an array of SDS strings,
  * otherwise NULL is returned and there is to read more buffer. */
-sds *ldbReplParseCommand(int *argcp) {
+sds *ldbReplParseCommand(int *argcp, char** err) {
+    static char* protocol_error = "protocol error";
     sds *argv = NULL;
     int argc = 0;
     if (sdslen(ldb.cbuf) == 0) return NULL;
@@ -1847,7 +2129,7 @@ sds *ldbReplParseCommand(int *argcp) {
     /* Seek and parse *<count>\r\n. */
     p = strchr(p,'*'); if (!p) goto protoerr;
     char *plen = p+1; /* Multi bulk len pointer. */
-    p = strstr(p,"\r\n"); if (!p) goto protoerr;
+    p = strstr(p,"\r\n"); if (!p) goto keep_reading;
     *p = '\0'; p += 2;
     *argcp = atoi(plen);
     if (*argcp <= 0 || *argcp > 1024) goto protoerr;
@@ -1856,12 +2138,16 @@ sds *ldbReplParseCommand(int *argcp) {
     argv = zmalloc(sizeof(sds)*(*argcp));
     argc = 0;
     while(argc < *argcp) {
+        /* reached the end but there should be more data to read */
+        if (*p == '\0') goto keep_reading;
+
         if (*p != '$') goto protoerr;
         plen = p+1; /* Bulk string len pointer. */
-        p = strstr(p,"\r\n"); if (!p) goto protoerr;
+        p = strstr(p,"\r\n"); if (!p) goto keep_reading;
         *p = '\0'; p += 2;
         int slen = atoi(plen); /* Length of this arg. */
         if (slen <= 0 || slen > 1024) goto protoerr;
+        if ((size_t)(p + slen + 2 - copy) > sdslen(copy) ) goto keep_reading;
         argv[argc++] = sdsnewlen(p,slen);
         p += slen; /* Skip the already parsed argument. */
         if (p[0] != '\r' || p[1] != '\n') goto protoerr;
@@ -1871,6 +2157,8 @@ sds *ldbReplParseCommand(int *argcp) {
     return argv;
 
 protoerr:
+    *err = protocol_error;
+keep_reading:
     sdsfreesplitres(argv,argc);
     sdsfree(copy);
     return NULL;
@@ -1898,7 +2186,7 @@ void ldbLogSourceLine(int lnum) {
 /* Implement the "list" command of the Lua debugger. If around is 0
  * the whole file is listed, otherwise only a small portion of the file
  * around the specified line is shown. When a line number is specified
- * the amonut of context (lines before/after) is specified via the
+ * the amount of context (lines before/after) is specified via the
  * 'context' argument. */
 void ldbList(int around, int context) {
     int j;
@@ -1909,7 +2197,7 @@ void ldbList(int around, int context) {
     }
 }
 
-/* Append an human readable representation of the Lua value at position 'idx'
+/* Append a human readable representation of the Lua value at position 'idx'
  * on the stack of the 'lua' state, to the SDS string passed as argument.
  * The new SDS string with the represented value attached is returned.
  * Used in order to implement ldbLogStackValue().
@@ -2019,6 +2307,11 @@ char *ldbRedisProtocolToHuman_Int(sds *o, char *reply);
 char *ldbRedisProtocolToHuman_Bulk(sds *o, char *reply);
 char *ldbRedisProtocolToHuman_Status(sds *o, char *reply);
 char *ldbRedisProtocolToHuman_MultiBulk(sds *o, char *reply);
+char *ldbRedisProtocolToHuman_Set(sds *o, char *reply);
+char *ldbRedisProtocolToHuman_Map(sds *o, char *reply);
+char *ldbRedisProtocolToHuman_Null(sds *o, char *reply);
+char *ldbRedisProtocolToHuman_Bool(sds *o, char *reply);
+char *ldbRedisProtocolToHuman_Double(sds *o, char *reply);
 
 /* Get Redis protocol from 'reply' and appends it in human readable form to
  * the passed SDS string 'o'.
@@ -2033,6 +2326,11 @@ char *ldbRedisProtocolToHuman(sds *o, char *reply) {
     case '+': p = ldbRedisProtocolToHuman_Status(o,reply); break;
     case '-': p = ldbRedisProtocolToHuman_Status(o,reply); break;
     case '*': p = ldbRedisProtocolToHuman_MultiBulk(o,reply); break;
+    case '~': p = ldbRedisProtocolToHuman_Set(o,reply); break;
+    case '%': p = ldbRedisProtocolToHuman_Map(o,reply); break;
+    case '_': p = ldbRedisProtocolToHuman_Null(o,reply); break;
+    case '#': p = ldbRedisProtocolToHuman_Bool(o,reply); break;
+    case ',': p = ldbRedisProtocolToHuman_Double(o,reply); break;
     }
     return p;
 }
@@ -2087,7 +2385,63 @@ char *ldbRedisProtocolToHuman_MultiBulk(sds *o, char *reply) {
     return p;
 }
 
-/* Log a Redis reply as debugger output, in an human readable format.
+char *ldbRedisProtocolToHuman_Set(sds *o, char *reply) {
+    char *p = strchr(reply+1,'\r');
+    long long mbulklen;
+    int j = 0;
+
+    string2ll(reply+1,p-reply-1,&mbulklen);
+    p += 2;
+    *o = sdscatlen(*o,"~(",2);
+    for (j = 0; j < mbulklen; j++) {
+        p = ldbRedisProtocolToHuman(o,p);
+        if (j != mbulklen-1) *o = sdscatlen(*o,",",1);
+    }
+    *o = sdscatlen(*o,")",1);
+    return p;
+}
+
+char *ldbRedisProtocolToHuman_Map(sds *o, char *reply) {
+    char *p = strchr(reply+1,'\r');
+    long long mbulklen;
+    int j = 0;
+
+    string2ll(reply+1,p-reply-1,&mbulklen);
+    p += 2;
+    *o = sdscatlen(*o,"{",1);
+    for (j = 0; j < mbulklen; j++) {
+        p = ldbRedisProtocolToHuman(o,p);
+        *o = sdscatlen(*o," => ",4);
+        p = ldbRedisProtocolToHuman(o,p);
+        if (j != mbulklen-1) *o = sdscatlen(*o,",",1);
+    }
+    *o = sdscatlen(*o,"}",1);
+    return p;
+}
+
+char *ldbRedisProtocolToHuman_Null(sds *o, char *reply) {
+    char *p = strchr(reply+1,'\r');
+    *o = sdscatlen(*o,"(null)",6);
+    return p+2;
+}
+
+char *ldbRedisProtocolToHuman_Bool(sds *o, char *reply) {
+    char *p = strchr(reply+1,'\r');
+    if (reply[1] == 't')
+        *o = sdscatlen(*o,"#true",5);
+    else
+        *o = sdscatlen(*o,"#false",6);
+    return p+2;
+}
+
+char *ldbRedisProtocolToHuman_Double(sds *o, char *reply) {
+    char *p = strchr(reply+1,'\r');
+    *o = sdscatlen(*o,"(double) ",9);
+    *o = sdscatlen(*o,reply+1,p-reply-1);
+    return p+2;
+}
+
+/* Log a Redis reply as debugger output, in a human readable format.
  * If the resulting string is longer than 'len' plus a few more chars
  * used as prefix, it gets truncated. */
 void ldbLogRedisReply(char *reply) {
@@ -2213,6 +2567,7 @@ void ldbEval(lua_State *lua, sds *argv, int argc) {
             ldbLog(sdscatfmt(sdsempty(),"<error> %s",lua_tostring(lua,-1)));
             lua_pop(lua,1);
             sdsfree(code);
+            sdsfree(expr);
             return;
         }
     }
@@ -2235,6 +2590,17 @@ void ldbEval(lua_State *lua, sds *argv, int argc) {
  * and its reply are logged. */
 void ldbRedis(lua_State *lua, sds *argv, int argc) {
     int j, saved_rc = server.lua_replicate_commands;
+
+    if (!lua_checkstack(lua, argc + 1)) {
+        /* Increase the Lua stack if needed to make sure there is enough room
+         * to push 'argc + 1' elements to the stack. On failure, return error.
+         * Notice that we need, in worst case, 'argc + 1' elements because we push all the arguments
+         * given by the user (without the first argument) and we also push the 'redis' global table and
+         * 'redis.call' function so:
+         * (1 (redis table)) + (1 (redis.call function)) + (argc - 1 (all arguments without the first)) = argc + 1*/
+        ldbLogRedisReply("max lua stack reached");
+        return;
+    }
 
     lua_getglobal(lua,"redis");
     lua_pushstring(lua,"call");
@@ -2270,7 +2636,7 @@ void ldbTrace(lua_State *lua) {
     }
 }
 
-/* Impleemnts the debugger "maxlen" command. It just queries or sets the
+/* Implements the debugger "maxlen" command. It just queries or sets the
  * ldb.maxlen variable. */
 void ldbMaxlen(sds *argv, int argc) {
     if (argc == 2) {
@@ -2292,13 +2658,18 @@ void ldbMaxlen(sds *argv, int argc) {
 int ldbRepl(lua_State *lua) {
     sds *argv;
     int argc;
+    char* err = NULL;
 
     /* We continue processing commands until a command that should return
      * to the Lua interpreter is found. */
     while(1) {
-        while((argv = ldbReplParseCommand(&argc)) == NULL) {
+        while((argv = ldbReplParseCommand(&argc, &err)) == NULL) {
             char buf[1024];
-            int nread = read(ldb.fd,buf,sizeof(buf));
+            if (err) {
+                lua_pushstring(lua, err);
+                lua_error(lua);
+            }
+            int nread = connRead(ldb.conn,buf,sizeof(buf));
             if (nread <= 0) {
                 /* Make sure the script runs without user input since the
                  * client is no longer connected. */
@@ -2307,6 +2678,15 @@ int ldbRepl(lua_State *lua) {
                 return C_ERR;
             }
             ldb.cbuf = sdscatlen(ldb.cbuf,buf,nread);
+            /* after 1M we will exit with an error
+             * so that the client will not blow the memory
+             */
+            if (sdslen(ldb.cbuf) > 1<<20) {
+                sdsfree(ldb.cbuf);
+                ldb.cbuf = sdsempty();
+                lua_pushstring(lua, "max client buffer reached");
+                lua_error(lua);
+            }
         }
 
         /* Flush the old buffer. */
@@ -2343,8 +2723,8 @@ ldbLog(sdsnew("                     mode dataset changes will be retained."));
 ldbLog(sdsnew(""));
 ldbLog(sdsnew("Debugger functions you can call from Lua scripts:"));
 ldbLog(sdsnew("redis.debug()        Produce logs in the debugger console."));
-ldbLog(sdsnew("redis.breakpoint()   Stop execution like if there was a breakpoing."));
-ldbLog(sdsnew("                     in the next line of code."));
+ldbLog(sdsnew("redis.breakpoint()   Stop execution like if there was a breakpoint in the"));
+ldbLog(sdsnew("                     next line of code."));
             ldbSendLogs();
         } else if (!strcasecmp(argv[0],"s") || !strcasecmp(argv[0],"step") ||
                    !strcasecmp(argv[0],"n") || !strcasecmp(argv[0],"next")) {
@@ -2419,7 +2799,7 @@ void luaLdbLineHook(lua_State *lua, lua_Debug *ar) {
 
     /* Check if a timeout occurred. */
     if (ar->event == LUA_HOOKCOUNT && ldb.step == 0 && bp == 0) {
-        mstime_t elapsed = mstime() - server.lua_time_start;
+        mstime_t elapsed = elapsedMs(server.lua_time_start);
         mstime_t timelimit = server.lua_time_limit ?
                              server.lua_time_limit : 5000;
         if (elapsed >= timelimit) {
@@ -2449,7 +2829,7 @@ void luaLdbLineHook(lua_State *lua, lua_Debug *ar) {
             lua_pushstring(lua, "timeout during Lua debugging with client closing connection");
             lua_error(lua);
         }
-        server.lua_time_start = mstime();
+        server.lua_time_start = getMonotonicUs();
+        server.lua_time_snapshot = mstime();
     }
 }
-

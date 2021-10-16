@@ -9,7 +9,7 @@ start_server {
         foreach entry $entries { r sadd $key $entry }
     }
 
-    test {SADD, SCARD, SISMEMBER, SMEMBERS basics - regular set} {
+    test {SADD, SCARD, SISMEMBER, SMISMEMBER, SMEMBERS basics - regular set} {
         create_set myset {foo}
         assert_encoding hashtable myset
         assert_equal 1 [r sadd myset bar]
@@ -18,10 +18,15 @@ start_server {
         assert_equal 1 [r sismember myset foo]
         assert_equal 1 [r sismember myset bar]
         assert_equal 0 [r sismember myset bla]
+        assert_equal {1} [r smismember myset foo]
+        assert_equal {1 1} [r smismember myset foo bar]
+        assert_equal {1 0} [r smismember myset foo bla]
+        assert_equal {0 1} [r smismember myset bla foo]
+        assert_equal {0} [r smismember myset bla]
         assert_equal {bar foo} [lsort [r smembers myset]]
     }
 
-    test {SADD, SCARD, SISMEMBER, SMEMBERS basics - intset} {
+    test {SADD, SCARD, SISMEMBER, SMISMEMBER, SMEMBERS basics - intset} {
         create_set myset {17}
         assert_encoding intset myset
         assert_equal 1 [r sadd myset 16]
@@ -30,7 +35,31 @@ start_server {
         assert_equal 1 [r sismember myset 16]
         assert_equal 1 [r sismember myset 17]
         assert_equal 0 [r sismember myset 18]
+        assert_equal {1} [r smismember myset 16]
+        assert_equal {1 1} [r smismember myset 16 17]
+        assert_equal {1 0} [r smismember myset 16 18]
+        assert_equal {0 1} [r smismember myset 18 16]
+        assert_equal {0} [r smismember myset 18]
         assert_equal {16 17} [lsort [r smembers myset]]
+    }
+
+    test {SMISMEMBER against non set} {
+        r lpush mylist foo
+        assert_error WRONGTYPE* {r smismember mylist bar}
+    }
+
+    test {SMISMEMBER non existing key} {
+        assert_equal {0} [r smismember myset1 foo]
+        assert_equal {0 0} [r smismember myset1 foo bar]
+    }
+
+    test {SMISMEMBER requires one or more members} {
+        r del zmscoretest
+        r zadd zmscoretest 10 x
+        r zadd zmscoretest 20 y
+        
+        catch {r smismember zmscoretest} e
+        assert_match {*ERR*wrong*number*arg*} $e
     }
 
     test {SADD against non set} {
@@ -49,6 +78,7 @@ start_server {
         create_set myset {213244124402402314402033402}
         assert_encoding hashtable myset
         assert_equal 1 [r sismember myset 213244124402402314402033402]
+        assert_equal {1} [r smismember myset 213244124402402314402033402]
     }
 
     test "SADD overflows the maximum allowed integers in an intset" {
@@ -246,14 +276,86 @@ start_server {
         }
     }
 
-    test "SINTER against non-set should throw error" {
-        r set key1 x
-        assert_error "WRONGTYPE*" {r sinter key1 noset}
+    test "SDIFF against non-set should throw error" {
+        # with an empty set
+        r set key1{t} x
+        assert_error "WRONGTYPE*" {r sdiff key1{t} noset{t}}
+        # different order
+        assert_error "WRONGTYPE*" {r sdiff noset{t} key1{t}}
+
+        # with a legal set
+        r del set1{t}
+        r sadd set1{t} a b c
+        assert_error "WRONGTYPE*" {r sdiff key1{t} set1{t}}
+        # different order
+        assert_error "WRONGTYPE*" {r sdiff set1{t} key1{t}}
     }
 
-    test "SUNION against non-set should throw error" {
-        r set key1 x
-        assert_error "WRONGTYPE*" {r sunion key1 noset}
+    test "SDIFF should handle non existing key as empty" {
+        r del set1{t} set2{t} set3{t}
+
+        r sadd set1{t} a b c
+        r sadd set2{t} b c d
+        assert_equal {a} [lsort [r sdiff set1{t} set2{t} set3{t}]]
+        assert_equal {} [lsort [r sdiff set3{t} set2{t} set1{t}]]
+    }
+
+    test "SDIFFSTORE against non-set should throw error" {
+        r del set1{t} set2{t} set3{t} key1{t}
+        r set key1{t} x
+
+        # with en empty dstkey
+        assert_error "WRONGTYPE*" {r SDIFFSTORE set3{t} key1{t} noset{t}}
+        assert_equal 0 [r exists set3{t}]
+        assert_error "WRONGTYPE*" {r SDIFFSTORE set3{t} noset{t} key1{t}}
+        assert_equal 0 [r exists set3{t}]
+
+        # with a legal dstkey
+        r sadd set1{t} a b c
+        r sadd set2{t} b c d
+        r sadd set3{t} e
+        assert_error "WRONGTYPE*" {r SDIFFSTORE set3{t} key1{t} set1{t} noset{t}}
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {e} [lsort [r smembers set3{t}]]
+
+        assert_error "WRONGTYPE*" {r SDIFFSTORE set3{t} set1{t} key1{t} set2{t}}
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {e} [lsort [r smembers set3{t}]]
+    }
+
+    test "SDIFFSTORE should handle non existing key as empty" {
+        r del set1{t} set2{t} set3{t}
+
+        r set setres{t} xxx
+        assert_equal 0 [r sdiffstore setres{t} foo111{t} bar222{t}]
+        assert_equal 0 [r exists setres{t}]
+
+        # with a legal dstkey, should delete dstkey
+        r sadd set3{t} a b c
+        assert_equal 0 [r sdiffstore set3{t} set1{t} set2{t}]
+        assert_equal 0 [r exists set3{t}]
+
+        r sadd set1{t} a b c
+        assert_equal 3 [r sdiffstore set3{t} set1{t} set2{t}]
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {a b c} [lsort [r smembers set3{t}]]
+
+        # with a legal dstkey and empty set2, should delete the dstkey
+        r sadd set3{t} a b c
+        assert_equal 0 [r sdiffstore set3{t} set2{t} set1{t}]
+        assert_equal 0 [r exists set3{t}]
+    }
+
+    test "SINTER against non-set should throw error" {
+        r set key1{t} x
+        assert_error "WRONGTYPE*" {r sinter key1{t} noset{t}}
+        # different order
+        assert_error "WRONGTYPE*" {r sinter noset{t} key1{t}}
+
+        r sadd set1{t} a b c
+        assert_error "WRONGTYPE*" {r sinter key1{t} set1{t}}
+        # different order
+        assert_error "WRONGTYPE*" {r sinter set1{t} key1{t}}
     }
 
     test "SINTER should handle non existing key as empty" {
@@ -273,10 +375,115 @@ start_server {
         lsort [r sinter set1 set2]
     } {1 2 3}
 
+    test "SINTERSTORE against non-set should throw error" {
+        r del set1{t} set2{t} set3{t} key1{t}
+        r set key1{t} x
+
+        # with en empty dstkey
+        assert_error "WRONGTYPE*" {r sinterstore set3{t} key1{t} noset{t}}
+        assert_equal 0 [r exists set3{t}]
+        assert_error "WRONGTYPE*" {r sinterstore set3{t} noset{t} key1{t}}
+        assert_equal 0 [r exists set3{t}]
+
+        # with a legal dstkey
+        r sadd set1{t} a b c
+        r sadd set2{t} b c d
+        r sadd set3{t} e
+        assert_error "WRONGTYPE*" {r sinterstore set3{t} key1{t} set2{t} noset{t}}
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {e} [lsort [r smembers set3{t}]]
+
+        assert_error "WRONGTYPE*" {r sinterstore set3{t} noset{t} key1{t} set2{t}}
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {e} [lsort [r smembers set3{t}]]
+    }
+
     test "SINTERSTORE against non existing keys should delete dstkey" {
-        r set setres xxx
-        assert_equal 0 [r sinterstore setres foo111 bar222]
-        assert_equal 0 [r exists setres]
+        r del set1{t} set2{t} set3{t}
+
+        r set setres{t} xxx
+        assert_equal 0 [r sinterstore setres{t} foo111{t} bar222{t}]
+        assert_equal 0 [r exists setres{t}]
+
+        # with a legal dstkey
+        r sadd set3{t} a b c
+        assert_equal 0 [r sinterstore set3{t} set1{t} set2{t}]
+        assert_equal 0 [r exists set3{t}]
+
+        r sadd set1{t} a b c
+        assert_equal 0 [r sinterstore set3{t} set1{t} set2{t}]
+        assert_equal 0 [r exists set3{t}]
+
+        assert_equal 0 [r sinterstore set3{t} set2{t} set1{t}]
+        assert_equal 0 [r exists set3{t}]
+    }
+
+    test "SUNION against non-set should throw error" {
+        r set key1{t} x
+        assert_error "WRONGTYPE*" {r sunion key1{t} noset{t}}
+        # different order
+        assert_error "WRONGTYPE*" {r sunion noset{t} key1{t}}
+
+        r del set1{t}
+        r sadd set1{t} a b c
+        assert_error "WRONGTYPE*" {r sunion key1{t} set1{t}}
+        # different order
+        assert_error "WRONGTYPE*" {r sunion set1{t} key1{t}}
+    }
+
+    test "SUNION should handle non existing key as empty" {
+        r del set1{t} set2{t} set3{t}
+
+        r sadd set1{t} a b c
+        r sadd set2{t} b c d
+        assert_equal {a b c d} [lsort [r sunion set1{t} set2{t} set3{t}]]
+    }
+
+    test "SUNIONSTORE against non-set should throw error" {
+        r del set1{t} set2{t} set3{t} key1{t}
+        r set key1{t} x
+
+        # with en empty dstkey
+        assert_error "WRONGTYPE*" {r sunionstore set3{t} key1{t} noset{t}}
+        assert_equal 0 [r exists set3{t}]
+        assert_error "WRONGTYPE*" {r sunionstore set3{t} noset{t} key1{t}}
+        assert_equal 0 [r exists set3{t}]
+
+        # with a legal dstkey
+        r sadd set1{t} a b c
+        r sadd set2{t} b c d
+        r sadd set3{t} e
+        assert_error "WRONGTYPE*" {r sunionstore set3{t} key1{t} key2{t} noset{t}}
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {e} [lsort [r smembers set3{t}]]
+
+        assert_error "WRONGTYPE*" {r sunionstore set3{t} noset{t} key1{t} key2{t}}
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {e} [lsort [r smembers set3{t}]]
+    }
+
+    test "SUNIONSTORE should handle non existing key as empty" {
+        r del set1{t} set2{t} set3{t}
+
+        r set setres{t} xxx
+        assert_equal 0 [r sunionstore setres{t} foo111{t} bar222{t}]
+        assert_equal 0 [r exists setres{t}]
+
+        # set1 set2 both empty, should delete the dstkey
+        r sadd set3{t} a b c
+        assert_equal 0 [r sunionstore set3{t} set1{t} set2{t}]
+        assert_equal 0 [r exists set3{t}]
+
+        r sadd set1{t} a b c
+        r sadd set3{t} e f
+        assert_equal 3 [r sunionstore set3{t} set1{t} set2{t}]
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {a b c} [lsort [r smembers set3{t}]]
+
+        r sadd set3{t} d
+        assert_equal 3 [r sunionstore set3{t} set2{t} set1{t}]
+        assert_equal 1 [r exists set3{t}]
+        assert_equal {a b c} [lsort [r smembers set3{t}]]
     }
 
     test "SUNIONSTORE against non existing keys should delete dstkey" {
@@ -373,9 +580,26 @@ start_server {
         assert {[lsort $union] eq [lsort $content]}
     }
 
+    test "SRANDMEMBER count of 0 is handled correctly" {
+        r srandmember myset 0
+    } {}
+
     test "SRANDMEMBER with <count> against non existing key" {
         r srandmember nonexisting_key 100
     } {}
+
+    # Make sure we can distinguish between an empty array and a null response
+    r readraw 1
+
+    test "SRANDMEMBER count of 0 is handled correctly - emptyarray" {
+        r srandmember myset 0
+    } {*0}
+
+    test "SRANDMEMBER with <count> against non existing key - emptyarray" {
+        r srandmember nonexisting_key 100
+    } {*0}
+
+    r readraw 0
 
     foreach {type contents} {
         hashtable {
@@ -471,7 +695,7 @@ start_server {
                 set iterations 1000
                 while {$iterations != 0} {
                     incr iterations -1
-                    set res [r srandmember myset -10]
+                    set res [r srandmember myset $size]
                     foreach ele $res {
                         set auxset($ele) 1
                     }
@@ -481,6 +705,45 @@ start_server {
                     }
                 }
                 assert {$iterations != 0}
+            }
+        }
+    }
+
+    foreach {type contents} {
+        hashtable {
+            1 5 10 50 125
+            MARY PATRICIA LINDA BARBARA ELIZABETH
+        }
+        intset {
+            0 1 2 3 4 5 6 7 8 9
+        }
+    } {
+        test "SRANDMEMBER histogram distribution - $type" {
+            create_set myset $contents
+            unset -nocomplain myset
+            array set myset {}
+            foreach ele [r smembers myset] {
+                set myset($ele) 1
+            }
+
+            # Use negative count (PATH 1).
+            # df = 9, 40 means 0.00001 probability
+            set res [r srandmember myset -1000]
+            assert_lessthan [chi_square_value $res] 40
+
+            # Use positive count (both PATH 3 and PATH 4).
+            foreach size {8 2} {
+                unset -nocomplain allkey
+                set iterations [expr {1000 / $size}]
+                while {$iterations != 0} {
+                    incr iterations -1
+                    set res [r srandmember myset $size]
+                    foreach ele $res {
+                        lappend allkey $ele
+                    }
+                }
+                # df = 9, 40 means 0.00001 probability
+                assert_lessthan [chi_square_value $allkey] 40
             }
         }
     }
@@ -562,6 +825,28 @@ start_server {
         r smove set set b
         lsort [r smembers set]
     } {a b c}
+
+    test "SMOVE only notify dstset when the addition is successful" {
+        r del srcset{t}
+        r del dstset{t}
+
+        r sadd srcset{t} a b
+        r sadd dstset{t} a
+
+        r watch dstset{t}
+
+        r multi
+        r sadd dstset{t} c
+
+        set r2 [redis_client]
+        $r2 smove srcset{t} dstset{t} a
+
+        # The dstset is actually unchanged, multi should success
+        r exec
+        set res [r scard dstset{t}]
+        assert_equal $res 2
+        $r2 close
+    }
 
     tags {slow} {
         test {intsets implementation stress testing} {
