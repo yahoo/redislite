@@ -85,7 +85,7 @@ int THPGetAnonHugePagesSize(void) {
 /* ---------------------------- Latency API --------------------------------- */
 
 /* Latency monitor initialization. We just need to create the dictionary
- * of time series, each time serie is craeted on demand in order to avoid
+ * of time series, each time serie is created on demand in order to avoid
  * having a fixed list to maintain. */
 void latencyMonitorInit(void) {
     server.latency_events = dictCreate(&latencyTimeSeriesDictType,NULL);
@@ -95,7 +95,7 @@ void latencyMonitorInit(void) {
  * This function is usually called via latencyAddSampleIfNeeded(), that
  * is a macro that only adds the sample if the latency is higher than
  * server.latency_monitor_threshold. */
-void latencyAddSample(char *event, mstime_t latency) {
+void latencyAddSample(const char *event, mstime_t latency) {
     struct latencyTimeSeries *ts = dictFetchValue(server.latency_events,event);
     time_t now = time(NULL);
     int prev;
@@ -476,19 +476,19 @@ sds createLatencyReport(void) {
 /* latencyCommand() helper to produce a time-delay reply for all the samples
  * in memory for the specified time series. */
 void latencyCommandReplyWithSamples(client *c, struct latencyTimeSeries *ts) {
-    void *replylen = addDeferredMultiBulkLength(c);
+    void *replylen = addReplyDeferredLen(c);
     int samples = 0, j;
 
     for (j = 0; j < LATENCY_TS_LEN; j++) {
         int i = (ts->idx + j) % LATENCY_TS_LEN;
 
         if (ts->samples[i].time == 0) continue;
-        addReplyMultiBulkLen(c,2);
+        addReplyArrayLen(c,2);
         addReplyLongLong(c,ts->samples[i].time);
         addReplyLongLong(c,ts->samples[i].latency);
         samples++;
     }
-    setDeferredMultiBulkLength(c,replylen,samples);
+    setDeferredArrayLen(c,replylen,samples);
 }
 
 /* latencyCommand() helper to produce the reply for the LATEST subcommand,
@@ -497,14 +497,14 @@ void latencyCommandReplyWithLatestEvents(client *c) {
     dictIterator *di;
     dictEntry *de;
 
-    addReplyMultiBulkLen(c,dictSize(server.latency_events));
+    addReplyArrayLen(c,dictSize(server.latency_events));
     di = dictGetIterator(server.latency_events);
     while((de = dictNext(di)) != NULL) {
         char *event = dictGetKey(de);
         struct latencyTimeSeries *ts = dictGetVal(de);
         int last = (ts->idx + LATENCY_TS_LEN - 1) % LATENCY_TS_LEN;
 
-        addReplyMultiBulkLen(c,4);
+        addReplyArrayLen(c,4);
         addReplyBulkCString(c,event);
         addReplyLongLong(c,ts->samples[last].time);
         addReplyLongLong(c,ts->samples[last].latency);
@@ -583,7 +583,7 @@ NULL
         /* LATENCY HISTORY <event> */
         ts = dictFetchValue(server.latency_events,c->argv[2]->ptr);
         if (ts == NULL) {
-            addReplyMultiBulkLen(c,0);
+            addReplyArrayLen(c,0);
         } else {
             latencyCommandReplyWithSamples(c,ts);
         }
@@ -599,7 +599,7 @@ NULL
         event = dictGetKey(de);
 
         graph = latencyCommandGenSparkeline(event,ts);
-        addReplyBulkCString(c,graph);
+        addReplyVerbatim(c,graph,sdslen(graph),"txt");
         sdsfree(graph);
     } else if (!strcasecmp(c->argv[1]->ptr,"latest") && c->argc == 2) {
         /* LATENCY LATEST */
@@ -608,7 +608,7 @@ NULL
         /* LATENCY DOCTOR */
         sds report = createLatencyReport();
 
-        addReplyBulkCBuffer(c,report,sdslen(report));
+        addReplyVerbatim(c,report,sdslen(report),"txt");
         sdsfree(report);
     } else if (!strcasecmp(c->argv[1]->ptr,"reset") && c->argc >= 2) {
         /* LATENCY RESET */
