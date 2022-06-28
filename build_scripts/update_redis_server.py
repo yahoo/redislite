@@ -7,7 +7,7 @@ import tarfile
 import tempfile
 
 
-url = 'http://download.redis.io/releases/redis-stable.tar.gz'
+url = 'http://download.redis.io/releases/redis-6.2.6.tar.gz'
 
 
 if __name__ == "__main__":
