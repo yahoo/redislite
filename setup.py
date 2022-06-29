@@ -56,9 +56,6 @@ def download_redis_submodule():
         # print('Updating jemalloc')
         # os.system('(cd redis.submodule;./deps/update-jemalloc.sh 4.0.4)')
 
-        print('Adding new redis.submodule files to git')
-        os.system('git add redis.submodule')
-
 
 class BuildRedis(build):
     global REDIS_SERVER_METADATA
