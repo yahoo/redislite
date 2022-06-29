@@ -35,7 +35,7 @@ install_scripts = ''
 try:
     VERSION = check_output(['meta', 'get', 'package.version']).decode(errors='ignore')
 except (subprocess.CalledProcessError, FileNotFoundError):
-    VERSION = '6.2.7'
+    VERSION = REDIS_VERSION
 
 
 def download_redis_submodule():
