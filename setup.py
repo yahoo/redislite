@@ -6,13 +6,19 @@ from __future__ import print_function
 import os
 import json
 import logging
+import pathlib
+import subprocess
+
 from setuptools import setup
 from setuptools.command.install import install
+import shutil
+import sys
+import urllib.request
+import tarfile
+import tempfile
 from distutils.command.build import build
 from distutils.core import Extension
 import distutils.util
-import os
-import sys
 from subprocess import call, check_output, CalledProcessError
 
 
@@ -23,11 +29,35 @@ METADATA_FILENAME = 'redislite/package_metadata.json'
 BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
 REDIS_SERVER_METADATA = {}
+REDIS_VERSION = os.environ.get('REDIS_VERSION', '6.2.7')
+REDIS_URL = f'http://download.redis.io/releases/redis-{REDIS_VERSION}.tar.gz'
 install_scripts = ''
 try:
     VERSION = check_output(['meta', 'get', 'package.version']).decode(errors='ignore')
-except:
-    VERSION = '5.0.5'
+except (subprocess.CalledProcessError, FileNotFoundError):
+    VERSION = '6.2.7'
+
+
+def download_redis_submodule():
+    if pathlib.Path(REDIS_PATH).exists():
+        shutil.rmtree(REDIS_PATH)
+    with tempfile.TemporaryDirectory() as tempdir:
+        print(f'Downloading {REDIS_URL} to temp directory {tempdir}')
+        ftpstream = urllib.request.urlopen(REDIS_URL)
+        tf = tarfile.open(fileobj=ftpstream, mode="r|gz")
+        directory = tf.next().name
+
+        print(f'Extracting archive {directory}')
+        tf.extractall(tempdir)
+
+        print(f'Moving {os.path.join(tempdir, directory)} -> redis.submodule')
+        shutil.move(os.path.join(tempdir, directory), 'redis.submodule')
+
+        # print('Updating jemalloc')
+        # os.system('(cd redis.submodule;./deps/update-jemalloc.sh 4.0.4)')
+
+        print('Adding new redis.submodule files to git')
+        os.system('git add redis.submodule')
 
 
 class BuildRedis(build):
@@ -243,7 +273,11 @@ if __name__ == '__main__':
 
     os.environ['CC'] = 'gcc'
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
+
+    if not os.path.exists(REDIS_PATH):
+        logger.debug(f'Downloading redis version {REDIS_VERSION}')
+        download_redis_submodule()
 
     logger.debug('Building for platform: %s', distutils.util.get_platform())
 

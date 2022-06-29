@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """ Update the redis.submodule in the redislite repo to the latest stable version """
 import os
+import pathlib
 import shutil
 import urllib.request
 import tarfile
 import tempfile
 
 
-url = 'http://download.redis.io/releases/redis-6.2.6.tar.gz'
+redis_version = os.environ.get('REDIS_VERSION', '6.2.7')
+url = f'http://download.redis.io/releases/redis-{redis_version}.tar.gz'
 
 
 if __name__ == "__main__":
-    shutil.rmtree('redis.submodule')
+    if pathlib.Path('redis_submodule').exists():
+        shutil.rmtree('redis.submodule')
     with tempfile.TemporaryDirectory() as tempdir:
         print(f'Downloading {url} to temp directory {tempdir}')
         ftpstream = urllib.request.urlopen(url)

@@ -3,6 +3,9 @@ shared:
   environment:
     CHANGELOG_FILENAME: docs/source/topic/changelog.md
     PACKAGE_DIRECTORY: redislite
+    REDIS_VERSION: '6.2.7'
+  steps:
+    postinit_os: build_scripts/update_redis_server.py
 
 jobs:
   validate_test:
