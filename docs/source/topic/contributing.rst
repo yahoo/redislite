@@ -13,12 +13,6 @@ The redislite project always needs more people to help others. As soon as you le
 * Write unit tests.  
 
 
-Sign the Contributor License Agreement
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Prior to submitting a pull request, please complete a `Yahoo CLA Agreement <https://yahoocla.herokuapp.com>`_.
-
-
 Set up Development Environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -163,26 +157,24 @@ Submitting Code
 To submit your code for inclusion upstream, do the following to ensure your
 submission only includes your new changes:
 
-1.  Make sure you have Completed a `Yahoo CLA Agreement <https://yahoocla.herokuapp.com>`_.
-2.  Redislite development occurs on github at: https://github.com/yahoo/redislite.  All 
+1.  Redislite development occurs on github at: https://github.com/yahoo/redislite.  All 
     development should occur on a fork of the redislite github repo.
-3.  Prior to submitting a pull request, perform a merge from the MASTER branch of the main
+2.  Prior to submitting a pull request, perform a merge from the MASTER branch of the main
     redislite repository into your fork.  This will ensure your pull request only includes your
     changes and will allow you to deal with any upstream changes that affect
     your code.
-4.  Clear up all PEP8 issues before submission.  This will ensure your changesets only 
+3.  Clear up all PEP8 issues before submission.  This will ensure your changesets only 
     include code changes and not formatting changes.
-5.  Clear up or document exceptions for all PyLint/Flake8 issues.  This will
+4.  Clear up or document exceptions for all PyLint/Flake8 issues.  This will
     ensure the evaluation and review of your code does not have common coding
     errors and decrease the human time to evaluate changes.
 
 Reviewing Pull Requests
 -----------------------
-When a pull request is submitted, three automated checks will automatically run, these checks are:
+When a pull request is submitted, two automated checks will automatically run, these checks are:
 
-1. Check that the submitter of the pull request has a `Yahoo CLA Agreement <https://yahoocla.herokuapp.com>`_ agreement on file.
-2. Check that all tests run without errors on all python releases that redislite supports.
-3. Check to ensure the coverage or amount of code that is not tested did not increase.
+1. Check that all tests run without errors on all python releases that redislite supports.
+2. Check to ensure the coverage or amount of code that is not tested did not increase.
 
 As these checks run the pull request will be annotated with the results.  If any of these checks fail the issue found needs to be fixed before the pull request can be applied.
 
