@@ -7,10 +7,6 @@ First steps
 -----------
 Start with these easy tasks to contribute to redislite.
 
-Sign the Contributor License Agreement
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Prior to submitting a pull request, please complete a `Yahoo CLA Agreement <https://yahoocla.herokuapp.com>`_.
-
 Set up Development Environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All redislite development uses the python `tox` tool.
