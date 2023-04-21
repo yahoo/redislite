@@ -14,13 +14,6 @@ The redislite project always needs more people to help others. As soon as you le
 * Improve the documentation.
 * Write unit tests.
 
-
-Sign the Contributor License Agreement
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Prior to submitting a pull request, please complete a `Yahoo CLA Agreement <https://yahoocla.herokuapp.com>`_.
-
-
 Set up Development Environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
