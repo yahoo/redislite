@@ -4,7 +4,7 @@ shared:
     CHANGELOG_FILENAME: docs/source/topic/changelog.md
     PACKAGE_DIRECTORY: redislite
     REDIS_VERSION: '6.2.7'
-    TOX_ENVLIST: py37,py38,py39,py310
+    TOX_ENVLIST: py37,py38,py39,py310,py311
   steps:
     - postinit_os: build_scripts/update_redis_server.py
 
@@ -31,14 +31,6 @@ jobs:
     template: python/package_python
     environment:
       PACKAGE_TYPES: sdist
-      PUBLISH: False
-    requires: [~commit, ~pr]
-
-  pkg_ml2010:
-    template: python/package_python
-    image: manylinux2010
-    environment:
-      PACKAGE_TYPES: wheel
       PUBLISH: False
     requires: [~commit, ~pr]
 
@@ -94,15 +86,6 @@ jobs:
     # publishes manylinux2010 wheels
     template: python/package_python
     environment:
-      PUBLISH: True
-    requires: [verify_test_pkg, verify_test_pkg_ml2014]
-
-  publish_pypi_ml2010:
-    template: python/package_python
-    image: manylinux2010
-    environment:
-      PACKAGE_TAG: False
-      PACKAGE_TYPES: wheel
       PUBLISH: True
     requires: [verify_test_pkg, verify_test_pkg_ml2014]
 

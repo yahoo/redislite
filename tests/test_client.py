@@ -14,6 +14,7 @@ import redislite
 import shutil
 import stat
 import tempfile
+import time
 import unittest
 from redis.exceptions import ConnectionError
 
@@ -67,10 +68,12 @@ class TestRedisliteClient(unittest.TestCase):
     def test_redislite_Redis(self):
         r = redislite.Redis()
         self._log_redis_pid(r)
-
-        r.set('key', 'value')
-        result = r.get('key').decode(encoding='UTF-8')
-        self.assertEqual(result, 'value')
+        r.set(b'key', b'value')
+        time.sleep(1)
+        value = r.get(b'key')
+        r.redis_log_tail(lines=0)
+        self.assertIsInstance(value, bytes)
+        self.assertEqual(value, b'value')
 
     def test_redislite_Redis_multiple(self):
         r1 = redislite.Redis()
@@ -208,7 +211,8 @@ class TestRedisliteClient(unittest.TestCase):
     def test_is_redis_running_no_pidfile(self):
         r = redislite.Redis()
         self._log_redis_pid(r)
-        r.shutdown()
+        self.assertTrue(r._is_redis_running())
+        r.shutdown(save=True, now=True, force=True)
         result = r._is_redis_running()
         self.assertFalse(result)
 

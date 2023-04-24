@@ -84,6 +84,9 @@ __pycache__/
 .idea/
 redislite/package_metadata.json
 
+# Pycharm venv
+/venv
+
 # testing artifacts
 cobertura.xml
 test_unit_redis.db
