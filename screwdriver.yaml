@@ -4,7 +4,7 @@ shared:
     CHANGELOG_FILENAME: docs/source/topic/changelog.md
     PACKAGE_DIRECTORY: redislite
     REDIS_VERSION: '6.2.7'
-    TOX_ENVLIST: py37,py38,py39,py310
+    TOX_ENVLIST: py37,py38,py39,py310,py311
   steps:
     - postinit_os: build_scripts/update_redis_server.py
 
@@ -34,14 +34,6 @@ jobs:
       PUBLISH: False
     requires: [~commit, ~pr]
 
-  pkg_ml2010:
-    template: python/package_python
-    image: manylinux2010
-    environment:
-      PACKAGE_TYPES: wheel
-      PUBLISH: False
-    requires: [~commit, ~pr]
-
   pkg_ml2014:
     template: python/package_python
     image: manylinux2014
@@ -60,7 +52,7 @@ jobs:
       PACKAGE_TAG: False
       PUBLISH: True
       TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-    requires: [validate_test, validate_lint, validate_codestyle, validate_documentation, pkg_sdist, pkg_ml2010, pkg_ml2014, generate_version]
+    requires: [validate_test, validate_lint, validate_codestyle, validate_documentation, pkg_sdist, pkg_ml2014, generate_version]
 
   publish_test_pypi_ml2014:
     template: python/package_python
@@ -70,7 +62,7 @@ jobs:
       PACKAGE_TYPES: wheel
       PUBLISH: True
       TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-    requires: [validate_test, validate_lint, validate_codestyle, validate_documentation, pkg_sdist, pkg_ml2010, pkg_ml2014, generate_version]
+    requires: [validate_test, validate_lint, validate_codestyle, validate_documentation, pkg_sdist, pkg_ml2014, generate_version]
 
   verify_test_pkg:
     template: python/validate_pypi_package
@@ -94,15 +86,6 @@ jobs:
     # publishes manylinux2010 wheels
     template: python/package_python
     environment:
-      PUBLISH: True
-    requires: [verify_test_pkg, verify_test_pkg_ml2014]
-
-  publish_pypi_ml2010:
-    template: python/package_python
-    image: manylinux2010
-    environment:
-      PACKAGE_TAG: False
-      PACKAGE_TYPES: wheel
       PUBLISH: True
     requires: [verify_test_pkg, verify_test_pkg_ml2014]
 
