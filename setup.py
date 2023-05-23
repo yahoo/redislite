@@ -70,7 +70,7 @@ class BuildRedis(build):
         os.environ['CC'] = 'gcc'
         os.environ['PREFIX'] = REDIS_PATH
         cmd = [
-            'make',
+            os.environ.get('MAKE', 'make'),
             'MALLOC=libc',
             'V=' + str(self.verbose),
         ]
