@@ -50,9 +50,10 @@ jobs:
     template: python/package_python
     environment:
       PACKAGE_TAG: False
+      PACKAGE_TYPES: sdist
       PUBLISH: True
       TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-    requires: [validate_test, validate_lint, validate_codestyle, validate_documentation, pkg_sdist, pkg_ml2010, pkg_ml2014, generate_version]
+    requires: [validate_test, validate_lint, validate_codestyle, validate_documentation, pkg_sdist, pkg_ml2014, generate_version]
 
   publish_test_pypi_ml2014:
     template: python/package_python
@@ -62,7 +63,7 @@ jobs:
       PACKAGE_TYPES: wheel
       PUBLISH: True
       TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-    requires: [validate_test, validate_lint, validate_codestyle, validate_documentation, pkg_sdist, pkg_ml2010, pkg_ml2014, generate_version]
+    requires: [validate_test, validate_lint, validate_codestyle, validate_documentation, pkg_sdist, pkg_ml2014, generate_version]
 
   verify_test_pkg:
     template: python/validate_pypi_package
@@ -86,6 +87,7 @@ jobs:
     # publishes manylinux2010 wheels
     template: python/package_python
     environment:
+      PACKAGE_TYPES: sdist
       PUBLISH: True
     requires: [verify_test_pkg, verify_test_pkg_ml2014]
 
