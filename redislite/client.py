@@ -90,7 +90,7 @@ class RedisMixin(object):
                     except psutil.NoSuchProcess:
                         process = None
                     if process:
-                        for i in range(5):
+                        for i in range(50):
                             if not process.is_running():
                                 break
                             time.sleep(.2)
@@ -99,7 +99,14 @@ class RedisMixin(object):
                         try:
                             process = psutil.Process(self.pid)
                             if process.is_running() and process.pid != 0:
-                                logger.warning('Redis shutdown failed, forcefully killing pid %r', self.pid)
+                                logger.warning(f'Redis shutdown failed, sending sigterm to {self.pid}')
+                                os.kill(self.pid, signal.SIGTERM)
+                                for i in range(120):  # default shutdown timeout is 10 seconds
+                                    if not process.is_running():
+                                        break
+                                    time.sleep(.1)
+                            if process.is_running() and process.pid != 0:
+                                logger.waring('Redis graceful shutdown failed, forcefully killing pid %r', self.pid)
                                 os.kill(self.pid, signal.SIGKILL)
                         except psutil.NoSuchProcess:
                             pass

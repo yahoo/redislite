@@ -50,9 +50,14 @@ class TestRedisliteClient(unittest.TestCase):
 
         return len(processes)
 
+    def _log_redis_log(self, connection):
+        if os.path.exists(connection.logfile):
+            with open(connection.logfile) as f:
+                print(f.read())
+
     def _log_redis_pid(self, connection):
-        logger.debug(
-            '%s: r.pid: %d', str(inspect.stack()[1][3]), connection.pid
+        print(
+            f'{str(inspect.stack()[1][3])}: r.pid: {connection.pid}'
         )
 
     def setUp(self):
@@ -158,6 +163,7 @@ class TestRedisliteClient(unittest.TestCase):
         full_socket_file_name = os.path.join(os.getcwd(), socket_file_name)
         r = redislite.Redis(unix_socket_path=socket_file_name)
         self._log_redis_pid(r)
+        r.redis_log_tail()
         self.assertEqual(r.socket_file, full_socket_file_name)
         print(os.listdir('.'))
         mode = os.stat(socket_file_name).st_mode
@@ -210,11 +216,14 @@ class TestRedisliteClient(unittest.TestCase):
 
     def test_is_redis_running_no_pidfile(self):
         r = redislite.Redis()
-        self._log_redis_pid(r)
-        self.assertTrue(r._is_redis_running())
-        r.shutdown(save=True, now=True, force=True)
+        self.assertTrue(r._is_redis_running(), 'Redis server should be running')
+
+        print("Shutting down the server the hard way", flush=True)
+        r.shutdown()
+
+        print('Checking if the server is running', flush=True)
         result = r._is_redis_running()
-        self.assertFalse(result)
+        self.assertFalse(result, 'Redis server should not be running')
 
     def test_refcount_cleanup(self):
         self.logger.debug('Setting up 2 connections to a single redis server.')
@@ -236,6 +245,7 @@ class TestRedisliteClient(unittest.TestCase):
         )
         r._cleanup()
 
+        self._log_redis_log(r)
         self.assertTrue(
             os.path.exists(redis_dir),
             msg='Shutting down the server removed the temporary directory'
@@ -259,7 +269,7 @@ class TestRedisliteClient(unittest.TestCase):
             'Second connection count is: %s', s._connection_count()
         )
         s._cleanup()
-        with self.assertRaises(psutil.NoSuchProcess):
+        with self.assertRaises(psutil.NoSuchProcess, msg=f'Redis cleanup method did not terminate pid {pid}'):
             p = psutil.Process(pid)
 
     def test_connection_count(self):
