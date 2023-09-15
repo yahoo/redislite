@@ -91,6 +91,9 @@ redislite/package_metadata.json
 cobertura.xml
 test_unit_redis.db
 
+# Redis submoudle should only be updated in ci/cd
+/redis.submodule/
+
 # redis build artifacts
 redis.submodule/**/*.o
 redis.submodule/**/.make-*
