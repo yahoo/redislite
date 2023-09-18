@@ -30,5 +30,5 @@ if __name__ == "__main__":
         # print('Updating jemalloc')
         # os.system('(cd redis.submodule;./deps/update-jemalloc.sh 4.0.4)')
         
-        print('Adding new redis.submodule files to git')
-        os.system('git add redis.submodule')
+        # print('Adding new redis.submodule files to git')
+        # os.system('git add redis.submodule')

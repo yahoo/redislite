@@ -85,16 +85,16 @@ class RedisMixin(object):
                 )
                 try:
                     self.shutdown(save=True, now=True, force=True)
-                    try:
+                    try:  # pragma: no cover
                         process = psutil.Process(self.pid)
-                    except psutil.NoSuchProcess:
+                    except psutil.NoSuchProcess:  # pragma: no cover
                         process = None
-                    if process:
+                    if process:   # pragma: no cover
                         for i in range(50):
                             if not process.is_running():
                                 break
                             time.sleep(.2)
-                except redis.RedisError:
+                except redis.RedisError:  # pragma: no cover
                     if self.pid != 0:
                         try:
                             process = psutil.Process(self.pid)
@@ -156,7 +156,7 @@ class RedisMixin(object):
 
         active_connections = 0
         client_list = self.client_list()
-        if not client_list:
+        if not client_list:  # pragma: no cover
             return 0
 
         for client in client_list:

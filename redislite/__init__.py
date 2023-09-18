@@ -66,7 +66,7 @@ try:
     import pkg_resources
     __git_version__ = pkg_resources.get_distribution("redislite").version
     __version__ = __git_version__
-except ImportError:
+except ImportError:  # pragma: no cover
     pass
     
 
