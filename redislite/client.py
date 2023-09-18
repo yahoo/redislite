@@ -72,7 +72,7 @@ class RedisMixin(object):
             sys.modules.update(sys_modules)
 
         if self.pid:
-            logger.debug('Connection count: %s', self._connection_count())
+            # logger.debug('Connection count: %s', self._connection_count())
             if self._connection_count() <= 1:
                 logger.debug(
                     'Last client using the connection, shutting down the '
@@ -83,7 +83,33 @@ class RedisMixin(object):
                 logger.debug(
                     'Shutting down redis server with pid of %r', self.pid
                 )
-                self.shutdown()
+                try:
+                    self.shutdown(save=True, now=True, force=True)
+                    try:  # pragma: no cover
+                        process = psutil.Process(self.pid)
+                    except psutil.NoSuchProcess:  # pragma: no cover
+                        process = None
+                    if process:   # pragma: no cover
+                        for i in range(50):
+                            if not process.is_running():
+                                break
+                            time.sleep(.2)
+                except redis.RedisError:  # pragma: no cover
+                    if self.pid != 0:
+                        try:
+                            process = psutil.Process(self.pid)
+                            if process.is_running() and process.pid != 0:
+                                logger.info(f'Redis shutdown failed, sending sigterm to {self.pid}')
+                                os.kill(self.pid, signal.SIGTERM)
+                                for i in range(120):  # default shutdown timeout is 10 seconds
+                                    if not process.is_running():
+                                        break
+                                    time.sleep(.1)
+                            if process.is_running() and process.pid != 0:
+                                logger.warning('Redis graceful shutdown failed, forcefully killing pid %r', self.pid)
+                                os.kill(self.pid, signal.SIGKILL)
+                        except psutil.NoSuchProcess:
+                            pass
                 self.socket_file = None
 
                 if self.pidfile and os.path.exists(
@@ -91,7 +117,12 @@ class RedisMixin(object):
                 ):   # pragma: no cover
                     # noinspection PyTypeChecker
                     pid = int(open(self.pidfile).read())
-                    os.kill(pid, signal.SIGKILL)
+                    try:
+                        process = psutil.Process(pid)
+                        if process.is_running():
+                            os.kill(pid, signal.SIGKILL)
+                    except psutil.NoSuchProcess:
+                        pass
 
                 if self.redis_dir and os.path.isdir(
                         self.redis_dir
@@ -122,8 +153,13 @@ class RedisMixin(object):
         """
         if not self._is_redis_running():  # pragma: no cover
             return 0
+
         active_connections = 0
-        for client in self.client_list():
+        client_list = self.client_list()
+        if not client_list:  # pragma: no cover
+            return 0
+
+        for client in client_list:
             flags = client.get('flags', '')
             flags = flags.upper()
             if 'U' in flags or 'N' in flags:  # pragma: no cover
@@ -289,12 +325,12 @@ class RedisMixin(object):
             if pid_number:
                 process = psutil.Process(pid_number)
                 if not process.is_running():  # pragma: no cover
-                    logger.warn(
+                    logger.warning(
                         'Loaded registry for non-existent redis-server'
                     )
                     return
         else:  # pragma: no cover
-            logger.warn('No pidfile found')
+            logger.warning('No pidfile found')
             return
         self.pidfile = settings['pidfile']
         self.socket_file = settings['unixsocket']
@@ -487,8 +523,11 @@ class RedisMixin(object):
         return 0  # pragma: no cover
 
 
+class BaseRedis(redis.Redis):
+    pass
+
 # noinspection PyUnresolvedReferences
-class Redis(RedisMixin, redis.Redis):
+class Redis(RedisMixin, BaseRedis):
     """
     This class provides an enhanced version of the :class:`redis.Redis()` class
     that uses an embedded redis-server by default.
@@ -595,8 +634,12 @@ class Redis(RedisMixin, redis.Redis):
     pass
 
 
+class BaseStrictRedis(redis.StrictRedis):
+    pass
+
+
 # noinspection PyUnresolvedReferences
-class StrictRedis(RedisMixin, redis.StrictRedis):
+class StrictRedis(RedisMixin, BaseStrictRedis):
     """
     This class provides an enhanced version of the :class:`redis.StrictRedis()`
     class that uses an embedded redis-server by default.

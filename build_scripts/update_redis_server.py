@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 
 
-redis_version = os.environ.get('REDIS_VERSION', '6.2.7')
+redis_version = os.environ.get('REDIS_VERSION', '6.2.9')
 url = f'http://download.redis.io/releases/redis-{redis_version}.tar.gz'
 
 
@@ -30,5 +30,5 @@ if __name__ == "__main__":
         # print('Updating jemalloc')
         # os.system('(cd redis.submodule;./deps/update-jemalloc.sh 4.0.4)')
         
-        print('Adding new redis.submodule files to git')
-        os.system('git add redis.submodule')
+        # print('Adding new redis.submodule files to git')
+        # os.system('git add redis.submodule')

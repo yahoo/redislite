@@ -3,7 +3,6 @@
 # See the accompanying LICENSE.txt file for terms.
 
 # metadata
-include README.rst
 include README.md
 
 graft redis.submodule
