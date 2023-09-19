@@ -70,7 +70,7 @@ jobs:
     environment:
         PYPI_INDEX_URL: https://test.pypi.org/simple
     steps:
-      - postinit_os: $PIP_CMD install "setuptools>=40.9.0"
+      - postinit_os: $BASE_PYTHON -m pip install "setuptools>=40.9.0"
     requires: [publish_test_pypi]
 
   verify_test_pkg_ml2014:
@@ -79,7 +79,7 @@ jobs:
     environment:
         PYPI_INDEX_URL: https://test.pypi.org/simple
     steps:
-      - postinit_os: $PIP_CMD install "setuptools>=40.9.0"
+      - postinit_os: $BASE_PYTHON -m pip "setuptools>=40.9.0"
     requires: [publish_test_pypi_ml2014]
     
   publish_documentation:
