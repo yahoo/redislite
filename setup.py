@@ -29,7 +29,7 @@ METADATA_FILENAME = 'redislite/package_metadata.json'
 BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
 REDIS_SERVER_METADATA = {}
-REDIS_VERSION = os.environ.get('REDIS_VERSION', '6.2.7')
+REDIS_VERSION = os.environ.get('REDIS_VERSION', '6.2.14')
 REDIS_URL = f'http://download.redis.io/releases/redis-{REDIS_VERSION}.tar.gz'
 install_scripts = ''
 try:
