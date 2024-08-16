@@ -106,8 +106,8 @@ class RedisMixin(object):
                                         break
                                     time.sleep(.1)
                             if process.is_running() and process.pid != 0:
-                                logger.warning('Redis graceful shutdown failed, forcefully killing pid %r', self.pid)
-                                os.kill(self.pid, signal.SIGKILL)
+                                logger.warning('Redis graceful shutdown failed, forcefully killing pid %r', process.pid)
+                                os.kill(process.pid, signal.SIGKILL)
                         except psutil.NoSuchProcess:
                             pass
                 self.socket_file = None
