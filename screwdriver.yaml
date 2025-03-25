@@ -3,7 +3,7 @@ shared:
   environment:
     CHANGELOG_FILENAME: docs/source/topic/changelog.md
     PACKAGE_DIRECTORY: redislite
-    REDIS_VERSION: '6.2.14'
+    REDIS_VERSION: '6.2.17'
     TOX_ENVLIST: py38,py39,py310,py311
   steps:
     - postinit_os: build_scripts/update_redis_server.py

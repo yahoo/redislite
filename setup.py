@@ -29,7 +29,7 @@ METADATA_FILENAME = 'redislite/package_metadata.json'
 BASEPATH = os.path.dirname(os.path.abspath(__file__))
 REDIS_PATH = os.path.join(BASEPATH, 'redis.submodule')
 REDIS_SERVER_METADATA = {}
-REDIS_VERSION = os.environ.get('REDIS_VERSION', '6.2.14')
+REDIS_VERSION = os.environ.get('REDIS_VERSION', '6.2.17')
 REDIS_URL = f'http://download.redis.io/releases/redis-{REDIS_VERSION}.tar.gz'
 install_scripts = ''
 try:
@@ -43,7 +43,11 @@ def download_redis_submodule():
         shutil.rmtree(REDIS_PATH)
     with tempfile.TemporaryDirectory() as tempdir:
         print(f'Downloading {REDIS_URL} to temp directory {tempdir}')
-        ftpstream = urllib.request.urlopen(REDIS_URL)
+        headers = {
+            'User-Agent': 'wget/1.21.2 (linux-gnu)'
+        }
+        req = urllib.request.Request(REDIS_URL, headers=headers)
+        ftpstream = urllib.request.urlopen(req)
         tf = tarfile.open(fileobj=ftpstream, mode="r|gz")
         directory = tf.next().name
 
