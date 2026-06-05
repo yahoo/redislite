@@ -313,7 +313,7 @@ class TestRedisliteClient(unittest.TestCase):
 
     def test_redis_log_attribute(self):
         r = redislite.StrictRedis()
-        self.assertIn('The server is now ready to accept connections', r.redis_log)
+        self.assertIn('Ready to accept connections', r.redis_log)
 
     def test_redis_log_tail(self):
         r = redislite.StrictRedis()
