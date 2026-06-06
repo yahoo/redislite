@@ -17,9 +17,18 @@ import unittest
 class TestRedisliteSlave(unittest.TestCase):
 
     def test_slave(self):
-        master = redislite.Redis(serverconfig={'port': '7000'})
+        master = redislite.Redis(
+            serverconfig={'port': '7000', 'repl-diskless-sync-delay': '0'}
+        )
         slave = redislite.Redis(serverconfig={'slaveof': 'localhost 7000'})
         master.set('key', 'value')
-        time.sleep(.5)
-        value = slave.get('key').decode(encoding='UTF-8')
-        self.assertEquals(value, 'value')
+
+        # Redis 7.x defaults to diskless replication, so wait for the sync rather than a fixed delay.
+        value = None
+        for _ in range(100):
+            raw = slave.get('key')
+            if raw is not None:
+                value = raw.decode(encoding='UTF-8')
+                break
+            time.sleep(0.1)
+        self.assertEqual(value, 'value')
